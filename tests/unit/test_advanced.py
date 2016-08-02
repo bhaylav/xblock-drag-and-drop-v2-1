@@ -62,10 +62,10 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
     """
     Common tests for drag and drop in standard mode
     """
-    def test_do_attempt_wrong_with_feedback(self):
+    def test_drop_item_wrong_with_feedback(self):
         item_id, zone_id = 0, self.ZONE_2
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
-        res = self.call_handler('do_attempt', data)
+        res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         self.assertEqual(res, {
             "overall_feedback": None,
             "finished": False,
@@ -73,10 +73,10 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
             "feedback": self.FEEDBACK[item_id]["incorrect"]
         })
 
-    def test_do_attempt_wrong_without_feedback(self):
+    def test_drop_item_wrong_without_feedback(self):
         item_id, zone_id = 2, self.ZONE_1
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
-        res = self.call_handler('do_attempt', data)
+        res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         self.assertEqual(res, {
             "overall_feedback": None,
             "finished": False,
@@ -84,10 +84,10 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
             "feedback": self.FEEDBACK[item_id]["incorrect"]
         })
 
-    def test_do_attempt_correct(self):
+    def test_drop_item_correct(self):
         item_id, zone_id = 0, self.ZONE_1
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
-        res = self.call_handler('do_attempt', data)
+        res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         self.assertEqual(res, {
             "overall_feedback": None,
             "finished": False,
@@ -103,23 +103,23 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
                 published_grades.append(params)
         self.block.runtime.publish = mock_publish
 
-        self.call_handler('do_attempt', {
+        self.call_handler(self.DROP_ITEM_HANDLER, {
             "val": 0, "zone": self.ZONE_1, "y_percent": "11%", "x_percent": "33%"
         })
 
         self.assertEqual(1, len(published_grades))
         self.assertEqual({'value': 0.5, 'max_value': 1}, published_grades[-1])
 
-        self.call_handler('do_attempt', {
+        self.call_handler(self.DROP_ITEM_HANDLER, {
             "val": 1, "zone": self.ZONE_2, "y_percent": "90%", "x_percent": "42%"
         })
 
         self.assertEqual(2, len(published_grades))
         self.assertEqual({'value': 1, 'max_value': 1}, published_grades[-1])
 
-    def test_do_attempt_final(self):
+    def test_drop_item_final(self):
         data = {"val": 0, "zone": self.ZONE_1, "x_percent": "33%", "y_percent": "11%"}
-        self.call_handler('do_attempt', data)
+        self.call_handler(self.DROP_ITEM_HANDLER, data)
 
         expected_state = {
             "items": {
@@ -132,7 +132,7 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
         self.assertEqual(expected_state, self.call_handler('get_user_state', method="GET"))
 
         data = {"val": 1, "zone": self.ZONE_2, "x_percent": "22%", "y_percent": "22%"}
-        res = self.call_handler('do_attempt', data)
+        res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         self.assertEqual(res, {
             "overall_feedback": self.FINAL_FEEDBACK,
             "finished": True,
@@ -160,10 +160,10 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
     """
     Common tests for drag and drop in assessment mode
     """
-    def test_do_attempt_in_assessment_mode(self):
+    def test_drop_item_in_assessment_mode(self):
         item_id, zone_id = 0, self.ZONE_1
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
-        res = self.call_handler('do_attempt', data)
+        res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         # In assessment mode, the do_attempt doesn't return any data.
         self.assertEqual(res, {})
 

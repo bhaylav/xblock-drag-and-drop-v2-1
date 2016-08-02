@@ -266,14 +266,12 @@ function DragAndDropTemplates(configuration) {
     var submitAnswerTemplate = function(ctx) {
         var attemptsUsedId = "attempts-used-"+configuration.url_name;
         var attemptsUsedDisplay = (ctx.max_attempts && ctx.max_attempts > 0) ? 'inline': 'none';
-        var button_enabled = ctx.items.some(function(item) {return item.is_placed;}) &&
-            (ctx.max_attempts === null || ctx.max_attempts > ctx.num_attempts);
 
         return (
           h("section.action-toolbar-item.submit-answer", {}, [
               h(
                   "button.btn-brand.submit-answer-button",
-                  {disabled: !button_enabled, attributes: {"aria-describedby": attemptsUsedId}},
+                  {disabled: ctx.disable_submit_button, attributes: {"aria-describedby": attemptsUsedId}},
                   gettext("Submit")
               ),
               h(
@@ -444,6 +442,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             // Set up event handlers:
 
             $(document).on('keydown mousedown touchstart', closePopup);
+            $element.on('click', '.submit-answer-button', doAttempt);
             $element.on('click', '.keyboard-help-button', showKeyboardHelp);
             $element.on('keydown', '.keyboard-help-button', function(evt) {
                 runOnKey(evt, RET, showKeyboardHelp);
@@ -897,7 +896,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         if (!zone) {
             return;
         }
-        var url = runtime.handlerUrl(element, 'do_attempt');
+        var url = runtime.handlerUrl(element, 'drop_item');
         var data = {
             val: item_id,
             zone: zone,
@@ -967,6 +966,44 @@ function DragAndDropBlock(runtime, element, configuration) {
             applyState();
             focusFirstDraggable();
         });
+    };
+
+    var doAttempt = function(evt) {
+        evt.preventDefault();
+
+        $.ajax({
+            type: 'POST',
+            url: runtime.handlerUrl(element, "do_attempt"),
+            data: '{}'
+        }).done(function(data){
+            state.num_attempts = data.num_attempts;
+            state.overall_feedback = data.feedback;
+            if (data.attempts_remain) {
+                for (var i=0; i < data.misplaced_items.length; i++) {
+                    var misplaced_item_id = data.misplaced_items[i];
+                    delete state.items[misplaced_item_id]
+                }
+            }
+            else {
+                state.finished = true;
+            }
+            applyState();
+            focusFirstDraggable();
+        })
+    };
+
+    var canSubmitAttempt = function() {
+        return Object.keys(state.items).length > 0 && (
+            configuration.max_attempts === null || configuration.max_attempts > state.num_attempts
+        );
+    };
+
+    var canReset = function() {
+        return Object.keys(state.items).length > 0 &&
+            (
+                configuration.mode != DragAndDropBlock.ASSESSMENT_MODE ||
+                canSubmitAttempt()
+            )
     };
 
     var render = function() {
@@ -1043,7 +1080,8 @@ function DragAndDropBlock(runtime, element, configuration) {
             item_bank_focusable: item_bank_focusable,
             popup_html: state.feedback || '',
             feedback_html: $.trim(state.overall_feedback),
-            disable_reset_button: Object.keys(state.items).length == 0,
+            disable_reset_button: !canReset(),
+            disable_submit_button: !canSubmitAttempt()
         };
 
         return renderView(context);

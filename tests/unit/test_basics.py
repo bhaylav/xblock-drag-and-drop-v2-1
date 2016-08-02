@@ -76,13 +76,13 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
 
         # Drag three items into the correct spot:
         data = {"val": 0, "zone": TOP_ZONE_ID, "x_percent": "33%", "y_percent": "11%"}
-        self.call_handler('do_attempt', data)
+        self.call_handler(self.DROP_ITEM_HANDLER, data)
         data = {"val": 1, "zone": MIDDLE_ZONE_ID, "x_percent": "67%", "y_percent": "80%"}
-        self.call_handler('do_attempt', data)
+        self.call_handler(self.DROP_ITEM_HANDLER, data)
         data = {"val": 2, "zone": BOTTOM_ZONE_ID, "x_percent": "99%", "y_percent": "95%"}
-        self.call_handler('do_attempt', data)
+        self.call_handler(self.DROP_ITEM_HANDLER, data)
         data = {"val": 3, "zone": MIDDLE_ZONE_ID, "x_percent": "67%", "y_percent": "80%"}
-        self.call_handler('do_attempt', data)
+        self.call_handler(self.DROP_ITEM_HANDLER, data)
 
         # Check the result:
         self.assertTrue(self.block.completed)

@@ -294,49 +294,174 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         }
 
     @XBlock.json_handler
-    def do_attempt(self, attempt, suffix=''):
-        item = self._get_item_definition(attempt['val'])
+    def drop_item(self, item_attempt, suffix=''):
+        self._validate_drop_item(item_attempt)
 
-        state = None
-        zone = None
-        feedback = item['feedback']['incorrect']
-        overall_feedback = None
-        is_correct = False
-
-        if self._is_attempt_correct(attempt):  # Student placed item in a correct zone
-            is_correct = True
-            feedback = item['feedback']['correct']
-            state = {
-                'zone': attempt['zone'],
-                'correct': True,
-                'x_percent': attempt['x_percent'],
-                'y_percent': attempt['y_percent'],
-            }
-
-        if state:
-            self.item_state[str(item['id'])] = state
-            zone = self._get_zone_by_uid(state['zone'])
+        if self.mode == self.ASSESSMENT_MODE:
+            return self._drop_item_assessment(item_attempt)
+        elif self.mode == self.STANDARD_MODE:
+            return self._drop_item_standard(item_attempt)
         else:
-            zone = self._get_zone_by_uid(attempt['zone'])
+            raise JsonHandlerError(500, _("Unknown DnDv2 mode {mode} - course is misconfigured").format(self.mode))
+
+    @XBlock.json_handler
+    def do_attempt(self, data, suffix=''):
+        self._validate_attempt()
+
+        self.num_attempts += 1
+        self._mark_complete_and_publish_grade()
+
+        __, placed, correct = self._get_item_raw_stats()
+        placed_ids, correct_ids = set(placed), set(correct)
+        misplaced_ids = placed_ids - correct_ids
+
+        feedback_msgs = [_('Correctly placed {correct_count} items, misplaced {misplaced_count} items.').format(
+            correct_count=len(correct_ids),
+            misplaced_count=len(misplaced_ids)
+        )]
+
+        if misplaced_ids:
+            feedback_msgs.append(_('Misplaced items were returned to item bank.'))
+        else:
+            feedback_msgs.append(self.data['feedback']['finish'])
+
+        for item_id in misplaced_ids:
+            del self.item_state[item_id]
+
+        if not self.attemps_remain:
+            feedback_msgs.append(_('Final attempt was used, final score is {score}').format(score=self._get_grade()))
+
+        return {
+            'num_attempts': self.num_attempts,
+            'misplaced_items': list(misplaced_ids),
+            'feedback': '\n'.join(feedback_msgs),
+            'attempts_remain': self.attemps_remain
+        }
+
+    def _validate_attempt(self):
+        if self.mode != self.ASSESSMENT_MODE:
+            raise JsonHandlerError(400, _("do_attempt handler should only be called for assessment mode"))
+        if not self.attemps_remain:
+            raise JsonHandlerError(409, _("Max number of attempts reached"))
+
+    @XBlock.json_handler
+    def publish_event(self, data, suffix=''):
+        try:
+            event_type = data.pop('event_type')
+        except KeyError:
+            return {'result': 'error', 'message': 'Missing event_type in JSON data'}
+
+        self.runtime.publish(self, event_type, data)
+        return {'result': 'success'}
+
+    @XBlock.json_handler
+    def reset(self, data, suffix=''):
+        self.item_state = {}
+        return self._get_user_state()
+
+    @XBlock.json_handler
+    def expand_static_url(self, url, suffix=''):
+        """ AJAX-accessible handler for expanding URLs to static [image] files """
+        return {'url': self._expand_static_url(url)}
+
+    @property
+    def target_img_expanded_url(self):
+        """ Get the expanded URL to the target image (the image items are dragged onto). """
+        if self.data.get("targetImg"):
+            return self._expand_static_url(self.data["targetImg"])
+        else:
+            return self.default_background_image_url
+
+    @property
+    def target_img_description(self):
+        """ Get the description for the target image (the image items are dragged onto). """
+        return self.data.get("targetImgDescription", "")
+
+    @property
+    def default_background_image_url(self):
+        """ The URL to the default background image, shown when no custom background is used """
+        return self.runtime.local_resource_url(self, "public/img/triangle.png")
+
+    @property
+    def attemps_remain(self):
+        return self.max_attempts is None or self.num_attempts < self.max_attempts
+
+    @XBlock.handler
+    def get_user_state(self, request, suffix=''):
+        """ GET all user-specific data, and any applicable feedback """
+        data = self._get_user_state()
+        return webob.Response(body=json.dumps(data), content_type='application/json')
+
+    def _drop_item_standard(self, item_attempt):
+        item = self._get_item_definition(item_attempt['val'])
+
+        is_correct = self._is_attempt_correct(item_attempt)  # Student placed item in a correct zone
+        if is_correct:  # In standard mode state is only updated when attempt is correct
+            self.item_state[str(item['id'])] = self._make_state_from_attempt(item_attempt, is_correct)
+
+        self._mark_complete_and_publish_grade()
+        self._publish_item_dropped_event(item_attempt, is_correct)
+
+        item_feedback_key = 'correct' if is_correct else 'incorrect'
+        item_feedback = item['feedback'][item_feedback_key]
+        overall_feedback = self.data['feedback']['finish'] if self._is_finished() else None
+
+        return {
+            'correct': is_correct,
+            'finished': self._is_finished(),
+            'overall_feedback': overall_feedback,
+            'feedback': item_feedback
+        }
+
+    def _drop_item_assessment(self, item_attempt):
+        if not self.attemps_remain:
+            raise JsonHandlerError(409, _("Max number of attempts reached"))
+
+        item = self._get_item_definition(item_attempt['val'])
+
+        is_correct = self._is_attempt_correct(item_attempt)
+        # State is always updated in assessment mode, to make do_attempt work correctly
+        self.item_state[str(item['id'])] = self._make_state_from_attempt(item_attempt, is_correct)
+
+        self._publish_item_dropped_event(item_attempt, self._is_attempt_correct(item_attempt))
+
+        return {}
+
+    def _validate_drop_item(self, item):
+        zone = self._get_zone_by_uid(item['zone'])
         if not zone:
             raise JsonHandlerError(400, "Item zone data invalid.")
 
-        if self._is_finished():
-            overall_feedback = self.data['feedback']['finish']
+    @staticmethod
+    def _make_state_from_attempt(attempt, correct):
+        return {
+            'zone': attempt['zone'],
+            'correct': correct,
+            'x_percent': attempt['x_percent'],
+            'y_percent': attempt['y_percent'],
+        }
 
+    def _mark_complete_and_publish_grade(self):
         # don't publish the grade if the student has already completed the problem
         if not self.completed:
-            if self._is_finished():
-                self.completed = True
-            try:
-                self.runtime.publish(self, 'grade', {
-                    'value': self._get_grade(),
-                    'max_value': self.weight,
-                })
-            except NotImplementedError:
-                # Note, this publish method is unimplemented in Studio runtimes,
-                # so we have to figure that we're running in Studio for now
-                pass
+            self.completed = self._is_finished()
+            self._publish_grade()
+
+    def _publish_grade(self):
+        try:
+            self.runtime.publish(self, 'grade', {
+                'value': self._get_grade(),
+                'max_value': self.weight,
+            })
+        except NotImplementedError:
+            # Note, this publish method is unimplemented in Studio runtimes,
+            # so we have to figure that we're running in Studio for now
+            pass
+
+    def _publish_item_dropped_event(self, attempt, is_correct):
+        item = self._get_item_definition(attempt['val'])
+        # attempt should already be validated here - not doing the check for existing zone again
+        zone = self._get_zone_by_uid(attempt['zone'])
 
         self.runtime.publish(self, 'edx.drag_and_drop_v2.item.dropped', {
             'item_id': item['id'],
@@ -344,24 +469,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             'location_id': zone.get("uid"),
             'is_correct': is_correct,
         })
-
-        if self.mode == self.ASSESSMENT_MODE:
-            # In assessment mode we don't send any feedback on drop.
-            result = {}
-        else:
-            result = {
-                'correct': is_correct,
-                'finished': self._is_finished(),
-                'overall_feedback': overall_feedback,
-                'feedback': feedback
-            }
-
-        return result
-
-    @XBlock.json_handler
-    def reset(self, data, suffix=''):
-        self.item_state = {}
-        return self._get_user_state()
 
     def _is_attempt_correct(self, attempt):
         """
@@ -388,35 +495,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             except ImportError:
                 pass
         return url
-
-    @XBlock.json_handler
-    def expand_static_url(self, url, suffix=''):
-        """ AJAX-accessible handler for expanding URLs to static [image] files """
-        return {'url': self._expand_static_url(url)}
-
-    @property
-    def target_img_expanded_url(self):
-        """ Get the expanded URL to the target image (the image items are dragged onto). """
-        if self.data.get("targetImg"):
-            return self._expand_static_url(self.data["targetImg"])
-        else:
-            return self.default_background_image_url
-
-    @property
-    def target_img_description(self):
-        """ Get the description for the target image (the image items are dragged onto). """
-        return self.data.get("targetImgDescription", "")
-
-    @property
-    def default_background_image_url(self):
-        """ The URL to the default background image, shown when no custom background is used """
-        return self.runtime.local_resource_url(self, "public/img/triangle.png")
-
-    @XBlock.handler
-    def get_user_state(self, request, suffix=''):
-        """ GET all user-specific data, and any applicable feedback """
-        data = self._get_user_state()
-        return webob.Response(body=json.dumps(data), content_type='application/json')
 
     def _get_user_state(self):
         """ Get all user-specific data, and any applicable feedback """
@@ -512,17 +590,22 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         Returns a tuple representing the number of correctly-placed items,
         and the total number of items that must be placed on the board (non-decoy items).
         """
-        all_items = self.data['items']
+        required_items, _, correct_items = self._get_item_raw_stats()
+
+        return len(correct_items), len(required_items)
+
+    def _get_item_raw_stats(self):
+        """
+        Returns a 3-tuple containing required, placed and correct items.
+        """
+        all_items = [str(item['id']) for item in self.data['items']]
         item_state = self._get_item_state()
 
-        required_items = [str(item['id']) for item in all_items if self._get_item_zones(item['id']) != []]
-        placed_items = [item for item in required_items if item in item_state]
-        correct_items = [item for item in placed_items if item_state[item]['correct']]
+        required_items = [item_id for item_id in all_items if self._get_item_zones(int(item_id)) != []]
+        placed_items = [item_id for item_id in all_items if item_id in item_state]
+        correct_items = [item_id for item_id in placed_items if item_state[item_id]['correct']]
 
-        required_count = len(required_items)
-        correct_count = len(correct_items)
-
-        return correct_count, required_count
+        return required_items, placed_items, correct_items
 
     def _get_grade(self):
         """
@@ -538,16 +621,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
         correct_count, required_count = self._get_item_stats()
         return correct_count == required_count
-
-    @XBlock.json_handler
-    def publish_event(self, data, suffix=''):
-        try:
-            event_type = data.pop('event_type')
-        except KeyError:
-            return {'result': 'error', 'message': 'Missing event_type in JSON data'}
-
-        self.runtime.publish(self, event_type, data)
-        return {'result': 'success'}
 
     def _get_unique_id(self):
         usage_id = self.scope_ids.usage_id

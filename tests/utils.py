@@ -35,6 +35,9 @@ class TestCaseMixin(object):
     """ Helpful mixins for unittest TestCase subclasses """
     maxDiff = None
 
+    DROP_ITEM_HANDLER = 'drop_item'
+    DO_ATTEMPT_HANDLER = 'do_attempt'
+
     def patch_workbench(self):
         self.apply_patch(
             'workbench.runtime.WorkbenchRuntime.local_resource_url',
