@@ -284,6 +284,10 @@
     border-top: solid 1px #bdbdbd;
 }
 
+.xblock--drag-and-drop .feedback p {
+    margin: 4px 0;
+}
+
 .xblock--drag-and-drop .popup {
     position: absolute;
     display: none;

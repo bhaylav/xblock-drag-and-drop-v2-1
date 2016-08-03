@@ -978,13 +978,11 @@ function DragAndDropBlock(runtime, element, configuration) {
         }).done(function(data){
             state.num_attempts = data.num_attempts;
             state.overall_feedback = data.feedback;
-            if (data.attempts_remain) {
-                for (var i=0; i < data.misplaced_items.length; i++) {
-                    var misplaced_item_id = data.misplaced_items[i];
+            if (attemptsRemain()) {
+                data.misplaced_items.forEach(function(misplaced_item_id) {
                     delete state.items[misplaced_item_id]
-                }
-            }
-            else {
+                });
+            } else {
                 state.finished = true;
             }
             applyState();
@@ -993,17 +991,16 @@ function DragAndDropBlock(runtime, element, configuration) {
     };
 
     var canSubmitAttempt = function() {
-        return Object.keys(state.items).length > 0 && (
-            configuration.max_attempts === null || configuration.max_attempts > state.num_attempts
-        );
+        return Object.keys(state.items).length > 0 && attemptsRemain();
     };
 
     var canReset = function() {
         return Object.keys(state.items).length > 0 &&
-            (
-                configuration.mode != DragAndDropBlock.ASSESSMENT_MODE ||
-                canSubmitAttempt()
-            )
+            (configuration.mode != DragAndDropBlock.ASSESSMENT_MODE || attemptsRemain())
+    };
+
+    var attemptsRemain = function() {
+        return configuration.max_attempts === null || configuration.max_attempts > state.num_attempts;
     };
 
     var render = function() {

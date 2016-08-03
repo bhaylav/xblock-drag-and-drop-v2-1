@@ -15,7 +15,7 @@ from xblock.fragment import Fragment
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 
-from .utils import _  # pylint: disable=unused-import
+from .utils import _, ngettext as ngettext_fallback
 from .default_data import DEFAULT_DATA
 
 
@@ -306,23 +306,41 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def do_attempt(self, data, suffix=''):
+        ngettext = self._get_ngettext()
         self._validate_attempt()
 
         self.num_attempts += 1
         self._mark_complete_and_publish_grade()
 
-        __, placed, correct = self._get_item_raw_stats()
+        required, placed, correct = self._get_item_raw_stats()
         placed_ids, correct_ids = set(placed), set(correct)
+        missing_ids = set(required) - set(placed)
         misplaced_ids = placed_ids - correct_ids
 
-        feedback_msgs = [_('Correctly placed {correct_count} items, misplaced {misplaced_count} items.').format(
-            correct_count=len(correct_ids),
-            misplaced_count=len(misplaced_ids)
-        )]
+        correct_count, misplaced_count, missing_count = len(correct_ids), len(misplaced_ids), len(missing_ids)
 
-        if misplaced_ids:
+        feedback_msgs = [
+            ngettext(
+                'Correctly placed {correct_count} item.',
+                'Correctly placed {correct_count} items.',
+                correct_count
+            ).format(correct_count=correct_count),
+            ngettext(
+                'Misplaced {misplaced_count} item.',
+                'Misplaced {misplaced_count} items.',
+                misplaced_count
+            ).format(misplaced_count=misplaced_count),
+            ngettext(
+                'Not placed {missing_count} required item.',
+                'Not placed {missing_count} required items.',
+                missing_count
+            ).format(missing_count=missing_count)
+        ]
+
+        if misplaced_ids and self.attemps_remain:
             feedback_msgs.append(_('Misplaced items were returned to item bank.'))
-        else:
+
+        if not misplaced_ids and not missing_ids:
             feedback_msgs.append(self.data['feedback']['finish'])
 
         for item_id in misplaced_ids:
@@ -334,8 +352,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {
             'num_attempts': self.num_attempts,
             'misplaced_items': list(misplaced_ids),
-            'feedback': '\n'.join(feedback_msgs),
-            'attempts_remain': self.attemps_remain
+            'feedback': ''.join(["<p>{}</p>".format(msg) for msg in feedback_msgs])
         }
 
     def _validate_attempt(self):
@@ -384,13 +401,20 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @property
     def attemps_remain(self):
-        return self.max_attempts is None or self.num_attempts < self.max_attempts
+        return self.max_attempts is None or self.max_attempts == 0 or self.num_attempts < self.max_attempts
 
     @XBlock.handler
     def get_user_state(self, request, suffix=''):
         """ GET all user-specific data, and any applicable feedback """
         data = self._get_user_state()
         return webob.Response(body=json.dumps(data), content_type='application/json')
+
+    def _get_ngettext(self):
+        i18n_service = self.runtime.service(self, "i18n")
+        if i18n_service:
+            return i18n_service.ngettext
+        else:
+            return ngettext_fallback
 
     def _drop_item_standard(self, item_attempt):
         item = self._get_item_definition(item_attempt['val'])
@@ -420,10 +444,10 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         item = self._get_item_definition(item_attempt['val'])
 
         is_correct = self._is_attempt_correct(item_attempt)
-        # State is always updated in assessment mode, to make do_attempt work correctly
+        # State is always updated in assessment mode to store intermediate item positions
         self.item_state[str(item['id'])] = self._make_state_from_attempt(item_attempt, is_correct)
 
-        self._publish_item_dropped_event(item_attempt, self._is_attempt_correct(item_attempt))
+        self._publish_item_dropped_event(item_attempt, is_correct)
 
         return {}
 
@@ -444,7 +468,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
     def _mark_complete_and_publish_grade(self):
         # don't publish the grade if the student has already completed the problem
         if not self.completed:
-            self.completed = self._is_finished()
+            self.completed = self._is_finished() or not self.attemps_remain
             self._publish_grade()
 
     def _publish_grade(self):
