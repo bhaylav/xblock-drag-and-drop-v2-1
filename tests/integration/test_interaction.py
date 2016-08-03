@@ -17,6 +17,7 @@ from drag_and_drop_v2.default_data import (
     ITEM_CORRECT_FEEDBACK, ITEM_INCORRECT_FEEDBACK, ITEM_NO_ZONE_FEEDBACK,
     ITEM_ANY_ZONE_FEEDBACK, START_FEEDBACK, FINISH_FEEDBACK
 )
+from drag_and_drop_v2.utils import FeedbackMessages
 from .test_base import BaseIntegrationTest
 
 
@@ -481,6 +482,23 @@ class DefaultAssessmentDataTestMixin(DefaultDataTestMixin):
         """.format(max_attempts=self.MAX_ATTEMPTS)
 
 
+class AssessmentTestMixin(object):
+    """
+    Provides helper methods for assessment tests
+    """
+    @staticmethod
+    def _wait_until_enabled(element):
+        wait = WebDriverWait(element, 2)
+        wait.until(lambda e: e.is_displayed() and e.get_attribute('disabled') is None)
+
+    def click_submit(self):
+        submit_button = self._get_submit_button()
+
+        self._wait_until_enabled(submit_button)
+
+        submit_button.click()
+
+
 @ddt
 class StandardInteractionTest(DefaultDataTestMixin, InteractionTestBase, BaseIntegrationTest):
     """
@@ -512,7 +530,9 @@ class StandardInteractionTest(DefaultDataTestMixin, InteractionTestBase, BaseInt
 
 
 @ddt
-class AssessmentInteractionTest(DefaultAssessmentDataTestMixin, InteractionTestBase, BaseIntegrationTest):
+class AssessmentInteractionTest(
+    DefaultAssessmentDataTestMixin, AssessmentTestMixin, InteractionTestBase, BaseIntegrationTest
+):
     """
     Testing interactions with Drag and Drop XBlock against default data in assessment mode.
     All interactions are tested using mouse (action_key=None) and four different keyboard action keys.
@@ -561,6 +581,81 @@ class AssessmentInteractionTest(DefaultAssessmentDataTestMixin, InteractionTestB
         self.place_item(first_item_definition.item_id, first_item_definition.zone_ids[0], None)
 
         self.assertEqual(submit_button.get_attribute('disabled'), None)
+
+    def test_misplaced_items_returned_to_bank(self):
+        correct_items = {0: TOP_ZONE_ID}
+        misplaced_items = {1: BOTTOM_ZONE_ID, 2: MIDDLE_ZONE_ID}
+
+        for item_id, zone_id in correct_items.iteritems():
+            self.place_item(item_id, zone_id)
+
+        for item_id, zone_id in misplaced_items.iteritems():
+            self.place_item(item_id, zone_id)
+
+        self.click_submit()
+        for item_id in correct_items:
+            self.assert_placed_item(item_id, TOP_ZONE_TITLE, assessment_mode=True)
+
+        for item_id in misplaced_items:
+            self.assert_reverted_item(item_id)
+
+    def test_max_attempts_reached_submit_and_reset_disabled(self):
+        self.place_item(0, TOP_ZONE_ID)
+
+        for _ in xrange(self.MAX_ATTEMPTS):
+            self.click_submit()
+
+        submit_button, reset_button = self._get_submit_button(), self._get_reset_button()
+        self.assertEqual(submit_button.get_attribute('disabled'), 'true')
+        self.assertEqual(reset_button.get_attribute('disabled'), 'true')
+
+    def test_do_attempt_feedback_is_updated(self):
+        # used keyboard mode to avoid bug/feature with selenium "selecting" everything instead of dragging an element
+        self.place_item(0, TOP_ZONE_ID, Keys.RETURN)
+
+        self.click_submit()
+
+        feedback_lines = [
+            "FEEDBACK",
+            FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1),
+            FeedbackMessages.MISPLACED_PLURAL_TPL.format(misplaced_count=0),
+            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=3),
+        ]
+        expected_feedback = "\n".join(feedback_lines)
+        self.assertEqual(self._get_feedback().text, expected_feedback)
+
+        self.place_item(1, BOTTOM_ZONE_ID, Keys.RETURN)
+        self.click_submit()
+
+        feedback_lines = [
+            "FEEDBACK",
+            FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1),
+            FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1),
+            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=2),
+            FeedbackMessages.MISPLACED_ITEMS_RETURNED
+        ]
+        expected_feedback = "\n".join(feedback_lines)
+        self.assertEqual(self._get_feedback().text, expected_feedback)
+
+        # reach final attempt
+        for _ in xrange(self.MAX_ATTEMPTS-3):
+            self.click_submit()
+
+        self.place_item(1, MIDDLE_ZONE_ID, Keys.RETURN)
+        self.place_item(2, BOTTOM_ZONE_ID, Keys.RETURN)
+        self.place_item(3, TOP_ZONE_ID, Keys.RETURN)
+
+        self.click_submit()
+        feedback_lines = [
+            "FEEDBACK",
+            FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=4),
+            FeedbackMessages.MISPLACED_PLURAL_TPL.format(misplaced_count=0),
+            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=0),
+            FINISH_FEEDBACK,
+            FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=1.0)
+        ]
+        expected_feedback = "\n".join(feedback_lines)
+        self.assertEqual(self._get_feedback().text, expected_feedback)
 
 
 class MultipleValidOptionsInteractionTest(DefaultDataTestMixin, InteractionTestBase, BaseIntegrationTest):
