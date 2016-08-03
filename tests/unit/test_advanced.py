@@ -325,6 +325,18 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
         self.assertTrue(res['misplaced_items'], misplaced_ids)
         self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
 
+    def test_get_user_state_does_not_include_correctness(self):
+        self._submit_complete_solution()
+        original_item_state = self.block.item_state
+
+        res = self.call_handler(self.USER_STATE_HANDLER)
+
+        item_data = res['items']
+        for item in item_data:
+            self.assertNotIn('correct', item)
+
+        self.assertEqual(self.block.item_state, original_item_state)
+
 
 class TestDragAndDropHtmlData(StandardModeFixture, unittest.TestCase):
     FOLDER = "html"

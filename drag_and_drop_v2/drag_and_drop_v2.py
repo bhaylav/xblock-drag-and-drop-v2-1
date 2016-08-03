@@ -374,6 +374,14 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
     def get_user_state(self, request, suffix=''):
         """ GET all user-specific data, and any applicable feedback """
         data = self._get_user_state()
+
+        # In assessment mode, if item is placed correctly and than the page is refreshed, "correct"
+        # will spill to the frontend, making item "disabled", thus allowing students to obtain answer by trial
+        # and error + refreshing the page. In order to avoid that, we remove "correct" from an item here
+        if self.mode == self.ASSESSMENT_MODE:
+            for item_id in data['items']:
+                del data['items'][item_id]["correct"]
+
         return webob.Response(body=json.dumps(data), content_type='application/json')
 
     def _get_ngettext(self):
@@ -562,9 +570,12 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     def _get_item_state(self):
         """
-        Returns the user item state.
+        Returns a copy of the user item state.
         Converts to a dict if data is stored in legacy tuple form.
         """
+
+        # IMPORTANT: this method should always return a COPY of self.item_state - it is called from get_user_state
+        # handler and manipulated there to hide correctness of items placed
         state = {}
 
         for item_id, item in self.item_state.iteritems():
