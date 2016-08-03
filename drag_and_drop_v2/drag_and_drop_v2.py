@@ -139,7 +139,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         default=False,
     )
 
-    max_grade = Float(
+    grade = Float(
         help=_("Keeps maximum achieved score by student"),
         scope=Scope.user_state,
         default=0
@@ -407,32 +407,44 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
         correct_count, misplaced_count, missing_count = len(correct_ids), len(misplaced_ids), len(missing_ids)
 
-        feedback_msgs = [
-            ngettext(
-                FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL,
-                FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL,
-                correct_count
-            ).format(correct_count=correct_count),
-            ngettext(
-                FeedbackMessages.MISPLACED_SINGULAR_TPL,
-                FeedbackMessages.MISPLACED_PLURAL_TPL,
-                misplaced_count
-            ).format(misplaced_count=misplaced_count),
-            ngettext(
-                FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL,
-                FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL,
-                missing_count
-            ).format(missing_count=missing_count)
-        ]
+        feedback_msgs = []
+
+        if correct_count > 0:
+            feedback_msgs.append(
+                ngettext(
+                    FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL,
+                    FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL,
+                    correct_count
+                ).format(correct_count=correct_count)
+            )
+
+        if misplaced_count > 0:
+            feedback_msgs.append(
+                ngettext(
+                    FeedbackMessages.MISPLACED_SINGULAR_TPL,
+                    FeedbackMessages.MISPLACED_PLURAL_TPL,
+                    misplaced_count
+                ).format(misplaced_count=misplaced_count)
+            )
+
+        if missing_count > 0:
+            feedback_msgs.append(
+                ngettext(
+                    FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL,
+                    FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL,
+                    missing_count
+                ).format(missing_count=missing_count)
+            )
 
         if misplaced_ids and self.attemps_remain:
             feedback_msgs.append(FeedbackMessages.MISPLACED_ITEMS_RETURNED)
+
         if not misplaced_ids and not missing_ids:
             feedback_msgs.append(self.data['feedback']['finish'])
 
         if not self.attemps_remain:
             feedback_msgs.append(
-                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.max_grade))
+                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.grade))
         return feedback_msgs, misplaced_ids
 
     def _drop_item_standard(self, item_attempt):
@@ -489,14 +501,14 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attemps_remain):
             self.completed = self._is_finished() or not self.attemps_remain
             grade = self._get_grade()
-            if grade > self.max_grade:
-                self.max_grade = grade
-                self._publish_grade(grade)
+            if grade > self.grade:
+                self.grade = grade
+                self._publish_grade()
 
-    def _publish_grade(self, grade):
+    def _publish_grade(self):
         try:
             self.runtime.publish(self, 'grade', {
-                'value': grade,
+                'value': self.grade,
                 'max_value': self.weight,
             })
         except NotImplementedError:

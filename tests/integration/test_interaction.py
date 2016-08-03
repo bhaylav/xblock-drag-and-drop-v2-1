@@ -618,7 +618,6 @@ class AssessmentInteractionTest(
         feedback_lines = [
             "FEEDBACK",
             FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1),
-            FeedbackMessages.MISPLACED_PLURAL_TPL.format(misplaced_count=0),
             FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=3),
         ]
         expected_feedback = "\n".join(feedback_lines)
@@ -649,8 +648,6 @@ class AssessmentInteractionTest(
         feedback_lines = [
             "FEEDBACK",
             FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=4),
-            FeedbackMessages.MISPLACED_PLURAL_TPL.format(misplaced_count=0),
-            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=0),
             FINISH_FEEDBACK,
             FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=1.0)
         ]
