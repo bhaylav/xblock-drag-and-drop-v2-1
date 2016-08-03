@@ -996,11 +996,11 @@ function DragAndDropBlock(runtime, element, configuration) {
 
     var canReset = function() {
         return Object.keys(state.items).length > 0 &&
-            (configuration.mode != DragAndDropBlock.ASSESSMENT_MODE || attemptsRemain())
+            (configuration.mode !== DragAndDropBlock.ASSESSMENT_MODE || attemptsRemain())
     };
 
     var attemptsRemain = function() {
-        return configuration.max_attempts === null || configuration.max_attempts > state.num_attempts;
+        return !configuration.max_attempts || configuration.max_attempts > state.num_attempts;
     };
 
     var render = function() {
