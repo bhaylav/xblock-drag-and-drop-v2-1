@@ -15,7 +15,7 @@ def ngettext(text_singular, text_plural, n):
 
 
 class FeedbackMessages(object):
-    FINAL_ATTEMPT_TPL = _('Final attempt was used, final score is {score}')
+    FINAL_ATTEMPT_TPL = _('Final attempt was used, highest score is {score}')
     MISPLACED_ITEMS_RETURNED = _('Misplaced items were returned to item bank.')
 
     CORRECTLY_PLACED_SINGULAR_TPL = _('Correctly placed {correct_count} item.')

@@ -272,7 +272,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
         self._reset_problem()
 
         with mock.patch('workbench.runtime.WorkbenchRuntime.publish', mock.Mock()) as patched_publish:
-            self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+            res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
 
             self.assertTrue(self.block.completed)
             self.assertFalse(patched_publish.called)
@@ -295,6 +295,28 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
 
             expected_grade_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=expected_grade)
             self.assertIn(expected_grade_feedback, res['feedback'])
+
+    def test_do_attempt_incorrect_final_attempt_after_correct(self):
+        self._submit_complete_solution()
+        self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+
+        self.assertTrue(self.block.completed)  # precondition check
+        self.assertEqual(self.block.max_grade, 1.0)  # precondition check
+
+        self._reset_problem()
+
+        self.block.max_attempts = 5
+        self.block.num_attempts = 4
+
+        self._submit_partial_solution()
+
+        with mock.patch('workbench.runtime.WorkbenchRuntime.publish', mock.Mock()) as patched_publish:
+            res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+
+            expected_grade_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=1.0)
+            self.assertFalse(patched_publish.called)
+            self.assertIn(expected_grade_feedback, res['feedback'])
+            self.assertEqual(self.block.max_grade, 1.0)
 
     def test_do_attempt_misplaced_ids(self):
         misplaced_ids = self._submit_incorrect_solution()
@@ -353,7 +375,8 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
     CORRECT_SOLUTION = {
         0: ZONE_1,
-        1: ZONE_2
+        1: ZONE_2,
+        2: ZONE_2
     }
 
     FEEDBACK = {
@@ -366,7 +389,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
     def _submit_partial_solution(self):
         self._submit_solution({0: self.ZONE_1})
-        return 0.5
+        return 1.0 / 3.0
 
     def _submit_incorrect_solution(self):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_1})
@@ -382,7 +405,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertIn(expected_misplaced, res['feedback'])
 
     def test_do_attempt_feedback_incorrect_not_placed(self):
-        self._submit_solution({0: self.ZONE_2})
+        self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         expected_misplaced = FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1)
         expected_not_placed = FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL.format(missing_count=1)
@@ -391,11 +414,11 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
     def test_do_attempt_feedback_not_placed(self):
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_not_placed = FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=2)
+        expected_not_placed = FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=3)
         self.assertIn(expected_not_placed, res['feedback'])
 
     def test_do_attempt_feedback_correct_and_decoy(self):
-        self._submit_solution({0: self.ZONE_1, 1:self.ZONE_2, 2: self.ZONE_2})  # incorrect solution - decoy placed
+        self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 3: self.ZONE_2})  # incorrect solution - decoy placed
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         expected_misplaced = FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1)
         expected_correct = FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=2)
@@ -404,9 +427,9 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
 
     def test_do_attempt_feedback_correct(self):
-        self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2})  # correct solution
+        self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_correct = FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=2)
+        expected_correct = FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=3)
         self.assertIn(expected_correct, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
 
@@ -414,7 +437,27 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self._submit_solution({0: self.ZONE_1})  # partial solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         expected_correct = FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1)
-        expected_missing = FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL.format(missing_count=1)
+        expected_missing = FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=2)
         self.assertIn(expected_correct, res['feedback'])
         self.assertIn(expected_missing, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
+
+    def test_do_attempt_keeps_highest_score(self):
+        self.assertFalse(self.block.completed)  # precondition check
+        expected_score = 2.0 / 3.0
+
+        self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2})  # partial solution, 0.66 score
+        res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+        self.assertEqual(self.block.max_grade, expected_score)
+
+        self._reset_problem()
+        # make it a last attempt so we can check feedback
+        self.block.max_attempts = 5
+        self.block.num_attempts = 4
+
+        self._submit_solution({0: self.ZONE_1})  # partial solution, 0.33 score
+        res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+        self.assertEqual(self.block.max_grade, expected_score)
+
+        expected_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=expected_score)
+        self.assertIn(expected_feedback, res['feedback'])

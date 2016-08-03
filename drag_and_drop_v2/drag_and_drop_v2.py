@@ -139,6 +139,12 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         default=False,
     )
 
+    max_grade = Float(
+        help=_("Keeps maximum achieved score by student"),
+        scope=Scope.user_state,
+        default=0
+    )
+
     block_settings_key = 'drag-and-drop-v2'
     has_score = True
 
@@ -418,7 +424,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
         if not self.attemps_remain:
             feedback_msgs.append(
-                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self._get_grade()))
+                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.max_grade))
         return feedback_msgs, misplaced_ids
 
     def _drop_item_standard(self, item_attempt):
@@ -474,12 +480,15 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         # don't publish the grade if the student has already completed the problem
         if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attemps_remain):
             self.completed = self._is_finished() or not self.attemps_remain
-            self._publish_grade()
+            grade = self._get_grade()
+            if grade > self.max_grade:
+                self.max_grade = grade
+                self._publish_grade(grade)
 
-    def _publish_grade(self):
+    def _publish_grade(self, grade):
         try:
             self.runtime.publish(self, 'grade', {
-                'value': self._get_grade(),
+                'value': grade,
                 'max_value': self.weight,
             })
         except NotImplementedError:
