@@ -15,7 +15,7 @@ from xblock.fragment import Fragment
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 
-from .utils import _, ngettext as ngettext_fallback
+from .utils import _, ngettext as ngettext_fallback, FeedbackMessages
 from .default_data import DEFAULT_DATA
 
 
@@ -306,60 +306,21 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def do_attempt(self, data, suffix=''):
-        ngettext = self._get_ngettext()
-        self._validate_attempt()
+        self._validate_do_attempt()
 
         self.num_attempts += 1
         self._mark_complete_and_publish_grade()
 
-        required, placed, correct = self._get_item_raw_stats()
-        placed_ids, correct_ids = set(placed), set(correct)
-        missing_ids = set(required) - set(placed)
-        misplaced_ids = placed_ids - correct_ids
-
-        correct_count, misplaced_count, missing_count = len(correct_ids), len(misplaced_ids), len(missing_ids)
-
-        feedback_msgs = [
-            ngettext(
-                'Correctly placed {correct_count} item.',
-                'Correctly placed {correct_count} items.',
-                correct_count
-            ).format(correct_count=correct_count),
-            ngettext(
-                'Misplaced {misplaced_count} item.',
-                'Misplaced {misplaced_count} items.',
-                misplaced_count
-            ).format(misplaced_count=misplaced_count),
-            ngettext(
-                'Not placed {missing_count} required item.',
-                'Not placed {missing_count} required items.',
-                missing_count
-            ).format(missing_count=missing_count)
-        ]
-
-        if misplaced_ids and self.attemps_remain:
-            feedback_msgs.append(_('Misplaced items were returned to item bank.'))
-
-        if not misplaced_ids and not missing_ids:
-            feedback_msgs.append(self.data['feedback']['finish'])
+        feedback_msgs, misplaced_ids = self._get_do_attempt_feedback()
 
         for item_id in misplaced_ids:
             del self.item_state[item_id]
-
-        if not self.attemps_remain:
-            feedback_msgs.append(_('Final attempt was used, final score is {score}').format(score=self._get_grade()))
 
         return {
             'num_attempts': self.num_attempts,
             'misplaced_items': list(misplaced_ids),
             'feedback': ''.join(["<p>{}</p>".format(msg) for msg in feedback_msgs])
         }
-
-    def _validate_attempt(self):
-        if self.mode != self.ASSESSMENT_MODE:
-            raise JsonHandlerError(400, _("do_attempt handler should only be called for assessment mode"))
-        if not self.attemps_remain:
-            raise JsonHandlerError(409, _("Max number of attempts reached"))
 
     @XBlock.json_handler
     def publish_event(self, data, suffix=''):
@@ -416,6 +377,50 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         else:
             return ngettext_fallback
 
+    def _validate_do_attempt(self):
+        if self.mode != self.ASSESSMENT_MODE:
+            raise JsonHandlerError(400, _("do_attempt handler should only be called for assessment mode"))
+        if not self.attemps_remain:
+            raise JsonHandlerError(409, _("Max number of attempts reached"))
+
+    def _get_do_attempt_feedback(self):
+        ngettext = self._get_ngettext()
+
+        required, placed, correct = self._get_item_raw_stats()
+        placed_ids, correct_ids = set(placed), set(correct)
+        missing_ids = set(required) - set(placed)
+        misplaced_ids = placed_ids - correct_ids
+
+        correct_count, misplaced_count, missing_count = len(correct_ids), len(misplaced_ids), len(missing_ids)
+
+        feedback_msgs = [
+            ngettext(
+                FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL,
+                FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL,
+                correct_count
+            ).format(correct_count=correct_count),
+            ngettext(
+                FeedbackMessages.MISPLACED_SINGULAR_TPL,
+                FeedbackMessages.MISPLACED_PLURAL_TPL,
+                misplaced_count
+            ).format(misplaced_count=misplaced_count),
+            ngettext(
+                FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL,
+                FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL,
+                missing_count
+            ).format(missing_count=missing_count)
+        ]
+
+        if misplaced_ids and self.attemps_remain:
+            feedback_msgs.append(FeedbackMessages.MISPLACED_ITEMS_RETURNED)
+        if not misplaced_ids and not missing_ids:
+            feedback_msgs.append(self.data['feedback']['finish'])
+
+        if not self.attemps_remain:
+            feedback_msgs.append(
+                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self._get_grade()))
+        return feedback_msgs, misplaced_ids
+
     def _drop_item_standard(self, item_attempt):
         item = self._get_item_definition(item_attempt['val'])
 
@@ -467,7 +472,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     def _mark_complete_and_publish_grade(self):
         # don't publish the grade if the student has already completed the problem
-        if not self.completed:
+        if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attemps_remain):
             self.completed = self._is_finished() or not self.attemps_remain
             self._publish_grade()
 
