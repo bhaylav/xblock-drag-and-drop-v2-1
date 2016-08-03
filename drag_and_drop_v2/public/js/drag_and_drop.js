@@ -271,8 +271,13 @@ function DragAndDropTemplates(configuration) {
           h("section.action-toolbar-item.submit-answer", {}, [
               h(
                   "button.btn-brand.submit-answer-button",
-                  {disabled: ctx.disable_submit_button, attributes: {"aria-describedby": attemptsUsedId}},
-                  gettext("Submit")
+                  {
+                      disabled: ctx.disable_submit_button || ctx.submit_spinner, 
+                      attributes: {"aria-describedby": attemptsUsedId}},
+                  [
+                      (ctx.submit_spinner ? h("span.fa.fa-spin.fa-spinner") : null),
+                      gettext("Submit")
+                  ]
               ),
               h(
                   "span.attempts-used#"+attemptsUsedId, {style: {display: attemptsUsedDisplay}},
@@ -970,6 +975,8 @@ function DragAndDropBlock(runtime, element, configuration) {
 
     var doAttempt = function(evt) {
         evt.preventDefault();
+        state.submit_spinner = true;
+        applyState();
 
         $.ajax({
             type: 'POST',
@@ -985,9 +992,11 @@ function DragAndDropBlock(runtime, element, configuration) {
             } else {
                 state.finished = true;
             }
-            applyState();
             focusFirstDraggable();
-        })
+        }).always(function() {
+            state.submit_spinner = false;
+            applyState();
+        });
     };
 
     var canSubmitAttempt = function() {
@@ -1078,7 +1087,8 @@ function DragAndDropBlock(runtime, element, configuration) {
             popup_html: state.feedback || '',
             feedback_html: $.trim(state.overall_feedback),
             disable_reset_button: !canReset(),
-            disable_submit_button: !canSubmitAttempt()
+            disable_submit_button: !canSubmitAttempt(),
+            submit_spinner: state.submit_spinner
         };
 
         return renderView(context);
