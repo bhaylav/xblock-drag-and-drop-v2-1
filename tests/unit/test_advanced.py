@@ -212,6 +212,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
         for item_id in item_zone_map:
             self.assertIn(str(item_id), self.block.item_state)
 
+    # pylint: disable=star-args
     @ddt.data(
         (None, 10, False),
         (0, 12, False),
@@ -228,7 +229,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
         else:
             self.assertEqual(res.status_code, 200)
 
-    @ddt.data(*[random.randint(0, 100) for _ in xrange(10)])
+    @ddt.data(*[random.randint(0, 100) for _ in xrange(10)])  # pylint: disable=star-args
     def test_do_attempt_raises_number_of_attempts(self, num_attempts):
         self.block.num_attempts = num_attempts
         self.block.max_attempts = num_attempts + 1

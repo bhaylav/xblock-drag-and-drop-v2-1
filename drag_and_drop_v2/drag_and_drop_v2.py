@@ -619,7 +619,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         Returns a tuple representing the number of correctly-placed items,
         and the total number of items that must be placed on the board (non-decoy items).
         """
-        required_items, _, correct_items = self._get_item_raw_stats()
+        required_items, __, correct_items = self._get_item_raw_stats()
 
         return len(correct_items), len(required_items)
 
