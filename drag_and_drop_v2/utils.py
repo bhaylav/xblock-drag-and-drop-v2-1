@@ -42,7 +42,7 @@ class FeedbackMessages(object):
     @staticmethod
     def not_placed(n, ngettext=ngettext_fallback):
         return ngettext(
-            'Not placed {missing_count} required item.',
-            'Not placed {missing_count} required items.',
+            'Did not place {missing_count} required item.',
+            'Did not place {missing_count} required items.',
             n
         ).format(missing_count=n)

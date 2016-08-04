@@ -507,7 +507,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: utils.py:40
-msgid "Not placed {missing_count} required item."
-msgid_plural "Not placed {missing_count} required items."
+msgid "Did not place {missing_count} required item."
+msgid_plural "Did not place {missing_count} required items."
 msgstr[0] ""
 msgstr[1] ""
