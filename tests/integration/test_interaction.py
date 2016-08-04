@@ -619,6 +619,8 @@ class AssessmentInteractionTest(
             "FEEDBACK",
             FeedbackMessages.correctly_placed(1),
             FeedbackMessages.not_placed(3),
+            START_FEEDBACK
+
         ]
         expected_feedback = "\n".join(feedback_lines)
         self.assertEqual(self._get_feedback().text, expected_feedback)
@@ -631,7 +633,8 @@ class AssessmentInteractionTest(
             FeedbackMessages.correctly_placed(1),
             FeedbackMessages.misplaced(2),
             FeedbackMessages.not_placed(2),
-            FeedbackMessages.MISPLACED_ITEMS_RETURNED
+            FeedbackMessages.MISPLACED_ITEMS_RETURNED,
+            START_FEEDBACK
         ]
         expected_feedback = "\n".join(feedback_lines)
         self.assertEqual(self._get_feedback().text, expected_feedback)

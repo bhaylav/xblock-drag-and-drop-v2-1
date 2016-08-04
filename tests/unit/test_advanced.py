@@ -397,6 +397,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         2: {"correct": "", "incorrect": ""}
     }
 
+    START_FEEDBACK = "This is the initial feedback."
     FINAL_FEEDBACK = "This is the final feedback."
 
     def _submit_partial_solution(self):
@@ -417,6 +418,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         expected_not_placed = FeedbackMessages.not_placed(1)
         self.assertIn(expected_misplaced, res['feedback'])
         self.assertIn(expected_not_placed, res['feedback'])
+        self.assertIn(self.START_FEEDBACK, res['feedback'])
 
     def test_do_attempt_feedback_incorrect_not_placed(self):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
@@ -425,11 +427,13 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         expected_not_placed = FeedbackMessages.not_placed(1)
         self.assertIn(expected_misplaced, res['feedback'])
         self.assertIn(expected_not_placed, res['feedback'])
+        self.assertIn(self.START_FEEDBACK, res['feedback'])
 
     def test_do_attempt_feedback_not_placed(self):
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         expected_not_placed = FeedbackMessages.not_placed(3)
         self.assertIn(expected_not_placed, res['feedback'])
+        self.assertIn(self.START_FEEDBACK, res['feedback'])
 
     def test_do_attempt_feedback_correct_and_decoy(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 3: self.ZONE_2})  # incorrect solution - decoy placed
@@ -439,6 +443,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertIn(expected_misplaced, res['feedback'])
         self.assertIn(expected_correct, res['feedback'])
         self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
+        self.assertIn(self.START_FEEDBACK, res['feedback'])
 
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
@@ -446,6 +451,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         expected_correct = FeedbackMessages.correctly_placed(3)
         self.assertIn(expected_correct, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
+        self.assertIn(self.FINAL_FEEDBACK, res['feedback'])
 
     def test_do_attempt_feedback_partial(self):
         self._submit_solution({0: self.ZONE_1})  # partial solution
@@ -455,6 +461,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertIn(expected_correct, res['feedback'])
         self.assertIn(expected_missing, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
+        self.assertIn(self.START_FEEDBACK, res['feedback'])
 
     def test_do_attempt_keeps_highest_score(self):
         self.assertFalse(self.block.completed)  # precondition check
@@ -475,3 +482,11 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
         expected_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=expected_score)
         self.assertIn(expected_feedback, res['feedback'])
+
+    def test_do_attempt_shows_final_feedback_at_last_attempt(self):
+        self.block.max_attempts = 5
+        self.block.num_attempts = 4
+
+        self._submit_partial_solution()
+        res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+        self.assertIn(self.FINAL_FEEDBACK, res['feedback'])

@@ -378,7 +378,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return self.runtime.local_resource_url(self, "public/img/triangle.png")
 
     @property
-    def attemps_remain(self):
+    def attempts_remain(self):
         return self.max_attempts is None or self.max_attempts == 0 or self.num_attempts < self.max_attempts
 
     @XBlock.handler
@@ -394,7 +394,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
                 400,
                 self.i18n_service.gettext("do_attempt handler should only be called for assessment mode")
             )
-        if not self.attemps_remain:
+        if not self.attempts_remain:
             raise JsonHandlerError(
                 409,
                 self.i18n_service.gettext("Max number of attempts reached")
@@ -421,15 +421,16 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         if missing_count > 0:
             feedback_msgs.append(FeedbackMessages.not_placed(missing_count, ngettext))
 
-        if misplaced_ids and self.attemps_remain:
+        if misplaced_ids and self.attempts_remain:
             feedback_msgs.append(FeedbackMessages.MISPLACED_ITEMS_RETURNED)
 
-        if not misplaced_ids and not missing_ids:
+        if self.attempts_remain and (misplaced_ids or missing_ids):
+            feedback_msgs.append(self.data['feedback']['start'])
+        else:
             feedback_msgs.append(self.data['feedback']['finish'])
 
-        if not self.attemps_remain:
-            feedback_msgs.append(
-                FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.grade))
+        if not self.attempts_remain:
+            feedback_msgs.append(FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.grade))
         return feedback_msgs, misplaced_ids
 
     def _drop_item_standard(self, item_attempt):
@@ -454,7 +455,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         }
 
     def _drop_item_assessment(self, item_attempt):
-        if not self.attemps_remain:
+        if not self.attempts_remain:
             raise JsonHandlerError(409, self.i18n_service.gettext("Max number of attempts reached"))
 
         item = self._get_item_definition(item_attempt['val'])
@@ -483,8 +484,8 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     def _mark_complete_and_publish_grade(self):
         # don't publish the grade if the student has already completed the problem
-        if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attemps_remain):
-            self.completed = self._is_finished() or not self.attemps_remain
+        if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attempts_remain):
+            self.completed = self._is_finished() or not self.attempts_remain
             grade = self._get_grade()
             if grade > self.grade:
                 self.grade = grade
