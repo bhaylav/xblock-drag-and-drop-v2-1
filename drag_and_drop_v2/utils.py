@@ -7,22 +7,42 @@ def _(text):
     return text
 
 
-def ngettext(text_singular, text_plural, n):
+def ngettext_fallback(text_singular, text_plural, n):
     if n == 1:
         return text_singular
     else:
         return text_plural
 
 
+class DummyTranslationService(object):
+    gettext = _
+    ngettext = ngettext_fallback
+
+
 class FeedbackMessages(object):
     FINAL_ATTEMPT_TPL = _('Final attempt was used, highest score is {score}')
     MISPLACED_ITEMS_RETURNED = _('Misplaced items were returned to item bank.')
 
-    CORRECTLY_PLACED_SINGULAR_TPL = _('Correctly placed {correct_count} item.')
-    CORRECTLY_PLACED_PLURAL_TPL = _('Correctly placed {correct_count} items.')
+    @staticmethod
+    def correctly_placed(n, ngettext=ngettext_fallback):
+        return ngettext(
+            'Correctly placed {correct_count} item.',
+            'Correctly placed {correct_count} items.',
+            n
+        ).format(correct_count=n)
 
-    MISPLACED_SINGULAR_TPL = _('Misplaced {misplaced_count} item.')
-    MISPLACED_PLURAL_TPL = _('Misplaced {misplaced_count} items.')
+    @staticmethod
+    def misplaced(n, ngettext=ngettext_fallback):
+        return ngettext(
+            'Misplaced {misplaced_count} item.',
+            'Misplaced {misplaced_count} items.',
+            n
+        ).format(misplaced_count=n)
 
-    NOT_PLACED_REQUIRED_SINGULAR_TPL = _('Not placed {missing_count} required item.',)
-    NOT_PLACED_REQUIRED_PLURAL_TPL = _('Not placed {missing_count} required items.')
+    @staticmethod
+    def not_placed(n, ngettext=ngettext_fallback):
+        return ngettext(
+            'Not placed {missing_count} required item.',
+            'Not placed {missing_count} required items.',
+            n
+        ).format(missing_count=n)

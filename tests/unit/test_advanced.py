@@ -413,27 +413,29 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_1})
 
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.MISPLACED_PLURAL_TPL.format(misplaced_count=2)
+        expected_misplaced = FeedbackMessages.misplaced(1)
+        expected_not_placed = FeedbackMessages.not_placed(1)
         self.assertIn(expected_misplaced, res['feedback'])
+        self.assertIn(expected_not_placed, res['feedback'])
 
     def test_do_attempt_feedback_incorrect_not_placed(self):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1)
-        expected_not_placed = FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL.format(missing_count=1)
+        expected_misplaced = FeedbackMessages.misplaced(1)
+        expected_not_placed = FeedbackMessages.not_placed(1)
         self.assertIn(expected_misplaced, res['feedback'])
         self.assertIn(expected_not_placed, res['feedback'])
 
     def test_do_attempt_feedback_not_placed(self):
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_not_placed = FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=3)
+        expected_not_placed = FeedbackMessages.not_placed(3)
         self.assertIn(expected_not_placed, res['feedback'])
 
     def test_do_attempt_feedback_correct_and_decoy(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 3: self.ZONE_2})  # incorrect solution - decoy placed
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1)
-        expected_correct = FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=2)
+        expected_misplaced = FeedbackMessages.misplaced(1)
+        expected_correct = FeedbackMessages.correctly_placed(2)
         self.assertIn(expected_misplaced, res['feedback'])
         self.assertIn(expected_correct, res['feedback'])
         self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
@@ -441,15 +443,15 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_correct = FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=3)
+        expected_correct = FeedbackMessages.correctly_placed(3)
         self.assertIn(expected_correct, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
 
     def test_do_attempt_feedback_partial(self):
         self._submit_solution({0: self.ZONE_1})  # partial solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_correct = FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1)
-        expected_missing = FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=2)
+        expected_correct = FeedbackMessages.correctly_placed(1)
+        expected_missing = FeedbackMessages.not_placed(2)
         self.assertIn(expected_correct, res['feedback'])
         self.assertIn(expected_missing, res['feedback'])
         self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])

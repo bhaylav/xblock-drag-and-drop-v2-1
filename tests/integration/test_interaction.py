@@ -617,8 +617,8 @@ class AssessmentInteractionTest(
 
         feedback_lines = [
             "FEEDBACK",
-            FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1),
-            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=3),
+            FeedbackMessages.correctly_placed(1),
+            FeedbackMessages.not_placed(3),
         ]
         expected_feedback = "\n".join(feedback_lines)
         self.assertEqual(self._get_feedback().text, expected_feedback)
@@ -628,9 +628,9 @@ class AssessmentInteractionTest(
 
         feedback_lines = [
             "FEEDBACK",
-            FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL.format(correct_count=1),
-            FeedbackMessages.MISPLACED_SINGULAR_TPL.format(misplaced_count=1),
-            FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL.format(missing_count=2),
+            FeedbackMessages.correctly_placed(1),
+            FeedbackMessages.misplaced(2),
+            FeedbackMessages.not_placed(2),
             FeedbackMessages.MISPLACED_ITEMS_RETURNED
         ]
         expected_feedback = "\n".join(feedback_lines)
@@ -647,7 +647,7 @@ class AssessmentInteractionTest(
         self.click_submit()
         feedback_lines = [
             "FEEDBACK",
-            FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL.format(correct_count=4),
+            FeedbackMessages.correctly_placed(4),
             FINISH_FEEDBACK,
             FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=1.0)
         ]

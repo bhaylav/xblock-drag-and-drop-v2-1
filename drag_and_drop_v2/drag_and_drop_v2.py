@@ -15,7 +15,7 @@ from xblock.fragment import Fragment
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 
-from .utils import _, ngettext as ngettext_fallback, FeedbackMessages
+from .utils import _, ngettext_fallback, FeedbackMessages, DummyTranslationService
 from .default_data import DEFAULT_DATA
 
 
@@ -308,7 +308,10 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         elif self.mode == self.STANDARD_MODE:
             return self._drop_item_standard(item_attempt)
         else:
-            raise JsonHandlerError(500, _("Unknown DnDv2 mode {mode} - course is misconfigured").format(self.mode))
+            raise JsonHandlerError(
+                500,
+                self.i18n_service.gettext("Unknown DnDv2 mode {mode} - course is misconfigured").format(self.mode)
+            )
 
     @XBlock.json_handler
     def do_attempt(self, data, suffix=''):
@@ -349,6 +352,14 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {'url': self._expand_static_url(url)}
 
     @property
+    def i18n_service(self):
+        i18n_service = self.runtime.service(self, "i18n")
+        if i18n_service:
+            return i18n_service
+        else:
+            return DummyTranslationService()
+
+    @property
     def target_img_expanded_url(self):
         """ Get the expanded URL to the target image (the image items are dragged onto). """
         if self.data.get("targetImg"):
@@ -377,21 +388,20 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
         return webob.Response(body=json.dumps(data), content_type='application/json')
 
-    def _get_ngettext(self):
-        i18n_service = self.runtime.service(self, "i18n")
-        if i18n_service:
-            return i18n_service.ngettext
-        else:
-            return ngettext_fallback
-
     def _validate_do_attempt(self):
         if self.mode != self.ASSESSMENT_MODE:
-            raise JsonHandlerError(400, _("do_attempt handler should only be called for assessment mode"))
+            raise JsonHandlerError(
+                400,
+                self.i18n_service.gettext("do_attempt handler should only be called for assessment mode")
+            )
         if not self.attemps_remain:
-            raise JsonHandlerError(409, _("Max number of attempts reached"))
+            raise JsonHandlerError(
+                409,
+                self.i18n_service.gettext("Max number of attempts reached")
+            )
 
     def _get_do_attempt_feedback(self):
-        ngettext = self._get_ngettext()
+        ngettext = self.i18n_service.ngettext
 
         required, placed, correct = self._get_item_raw_stats()
         placed_ids, correct_ids = set(placed), set(correct)
@@ -403,31 +413,13 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         feedback_msgs = []
 
         if correct_count > 0:
-            feedback_msgs.append(
-                ngettext(
-                    FeedbackMessages.CORRECTLY_PLACED_SINGULAR_TPL,
-                    FeedbackMessages.CORRECTLY_PLACED_PLURAL_TPL,
-                    correct_count
-                ).format(correct_count=correct_count)
-            )
+            feedback_msgs.append(FeedbackMessages.correctly_placed(correct_count, ngettext))
 
         if misplaced_count > 0:
-            feedback_msgs.append(
-                ngettext(
-                    FeedbackMessages.MISPLACED_SINGULAR_TPL,
-                    FeedbackMessages.MISPLACED_PLURAL_TPL,
-                    misplaced_count
-                ).format(misplaced_count=misplaced_count)
-            )
+            feedback_msgs.append(FeedbackMessages.misplaced(missing_count, ngettext))
 
         if missing_count > 0:
-            feedback_msgs.append(
-                ngettext(
-                    FeedbackMessages.NOT_PLACED_REQUIRED_SINGULAR_TPL,
-                    FeedbackMessages.NOT_PLACED_REQUIRED_PLURAL_TPL,
-                    missing_count
-                ).format(missing_count=missing_count)
-            )
+            feedback_msgs.append(FeedbackMessages.not_placed(missing_count, ngettext))
 
         if misplaced_ids and self.attemps_remain:
             feedback_msgs.append(FeedbackMessages.MISPLACED_ITEMS_RETURNED)
@@ -463,7 +455,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     def _drop_item_assessment(self, item_attempt):
         if not self.attemps_remain:
-            raise JsonHandlerError(409, _("Max number of attempts reached"))
+            raise JsonHandlerError(409, self.i18n_service.gettext("Max number of attempts reached"))
 
         item = self._get_item_definition(item_attempt['val'])
 
