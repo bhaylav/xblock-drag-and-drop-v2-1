@@ -564,7 +564,10 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             if self.mode == self.ASSESSMENT_MODE:
                 del item["correct"]
 
-        is_finished = self._is_finished() if self.mode == self.STANDARD_MODE else self.num_attempts >= self.max_attempts > 0
+        if self.mode == self.STANDARD_MODE:
+            is_finished = self._is_finished()
+        else:
+            is_finished = self.num_attempts >= self.max_attempts > 0
 
         return {
             'items': item_state,
