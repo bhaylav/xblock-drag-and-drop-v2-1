@@ -375,13 +375,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """ GET all user-specific data, and any applicable feedback """
         data = self._get_user_state()
 
-        # In assessment mode, if item is placed correctly and than the page is refreshed, "correct"
-        # will spill to the frontend, making item "disabled", thus allowing students to obtain answer by trial
-        # and error + refreshing the page. In order to avoid that, we remove "correct" from an item here
-        if self.mode == self.ASSESSMENT_MODE:
-            for item_id in data['items']:
-                del data['items'][item_id]["correct"]
-
         return webob.Response(body=json.dumps(data), content_type='application/json')
 
     def _get_ngettext(self):
@@ -572,6 +565,12 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
                 else:
                     item['zone'] = 'unknown'
 
+            # In assessment mode, if item is placed correctly and than the page is refreshed, "correct"
+            # will spill to the frontend, making item "disabled", thus allowing students to obtain answer by trial
+            # and error + refreshing the page. In order to avoid that, we remove "correct" from an item here
+            if self.mode == self.ASSESSMENT_MODE:
+                del item["correct"]
+
         is_finished = self._is_finished()
         return {
             'items': item_state,
@@ -592,7 +591,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
         for item_id, item in self.item_state.iteritems():
             if isinstance(item, dict):
-                state[item_id] = item
+                state[item_id] = item.copy()  # items are manipulated in _get_user_state, so we protect actual data
             else:
                 state[item_id] = {'top': item[0], 'left': item[1]}
 
