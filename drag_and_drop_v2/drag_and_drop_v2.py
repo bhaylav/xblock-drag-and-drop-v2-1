@@ -3,10 +3,10 @@
 """ Drag and Drop v2 XBlock """
 # Imports ###########################################################
 
-import json
-import webob
 import copy
+import json
 import urllib
+import webob
 
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError

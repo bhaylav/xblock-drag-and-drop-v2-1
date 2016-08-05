@@ -103,7 +103,7 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
     def test_grading(self):
         published_grades = []
 
-        def mock_publish(self, event, params):
+        def mock_publish(_, event, params):
             if event == 'grade':
                 published_grades.append(params)
         self.block.runtime.publish = mock_publish
@@ -190,8 +190,8 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
     def _submit_complete_solution(self):
         self._submit_solution(self.CORRECT_SOLUTION)
 
-    def _submit_partial_solution(self):
-        raise NotImplementedException()
+    def _submit_partial_solution(self):  # pylint: disable=no-self-use
+        raise NotImplementedError()
 
     def _reset_problem(self):
         self.call_handler(self.RESET_HANDLER, data={})

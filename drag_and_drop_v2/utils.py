@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """ Drag and Drop v2 XBlock - Utils """
 
+
 def _(text):
     """ Dummy `gettext` replacement to make string extraction tools scrape strings marked for translation """
     return text
 
 
-def ngettext_fallback(text_singular, text_plural, n):
+def ngettext_fallback(text_singular, text_plural, number):
     """ Dummy `ngettext` replacement to make string extraction tools scrape strings marked for translation """
-    if n == 1:
+    if number == 1:
         return text_singular
     else:
         return text_plural
@@ -30,34 +31,34 @@ class FeedbackMessages(object):
     MISPLACED_ITEMS_RETURNED = _('Misplaced items were returned to item bank.')
 
     @staticmethod
-    def correctly_placed(n, ngettext=ngettext_fallback):
+    def correctly_placed(number, ngettext=ngettext_fallback):
         """
         Formats "correctly placed items" message
         """
         return ngettext(
             'Correctly placed {correct_count} item.',
             'Correctly placed {correct_count} items.',
-            n
-        ).format(correct_count=n)
+            number
+        ).format(correct_count=number)
 
     @staticmethod
-    def misplaced(n, ngettext=ngettext_fallback):
+    def misplaced(number, ngettext=ngettext_fallback):
         """
         Formats "misplaced items" message
         """
         return ngettext(
             'Misplaced {misplaced_count} item.',
             'Misplaced {misplaced_count} items.',
-            n
-        ).format(misplaced_count=n)
+            number
+        ).format(misplaced_count=number)
 
     @staticmethod
-    def not_placed(n, ngettext=ngettext_fallback):
+    def not_placed(number, ngettext=ngettext_fallback):
         """
         Formats "did not place required items" message
         """
         return ngettext(
             'Did not place {missing_count} required item.',
             'Did not place {missing_count} required items.',
-            n
-        ).format(missing_count=n)
+            number
+        ).format(missing_count=number)
