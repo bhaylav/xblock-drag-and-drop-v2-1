@@ -15,7 +15,7 @@ from xblock.fragment import Fragment
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 
-from .utils import _, ngettext_fallback, FeedbackMessages, DummyTranslationService
+from .utils import _, FeedbackMessages, DummyTranslationService
 from .default_data import DEFAULT_DATA
 
 
@@ -401,36 +401,29 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             )
 
     def _get_do_attempt_feedback(self):
-        ngettext = self.i18n_service.ngettext
-
-        required, placed, correct = self._get_item_raw_stats()
-        placed_ids, correct_ids = set(placed), set(correct)
-        missing_ids = set(required) - set(placed)
+        required_ids, placed_ids, correct_ids = self._get_item_raw_stats()
+        missing_ids = required_ids - placed_ids
         misplaced_ids = placed_ids - correct_ids
-
-        correct_count, misplaced_count, missing_count = len(correct_ids), len(misplaced_ids), len(missing_ids)
 
         feedback_msgs = []
 
-        if correct_count > 0:
-            feedback_msgs.append(FeedbackMessages.correctly_placed(correct_count, ngettext))
+        def _add_msg_if_exists(ids_list, message):
+            if ids_list:
+                feedback_msgs.append(message(len(ids_list), self.i18n_service.ngettext))
 
-        if misplaced_count > 0:
-            feedback_msgs.append(FeedbackMessages.misplaced(missing_count, ngettext))
-
-        if missing_count > 0:
-            feedback_msgs.append(FeedbackMessages.not_placed(missing_count, ngettext))
+        _add_msg_if_exists(correct_ids, FeedbackMessages.correctly_placed)
+        _add_msg_if_exists(misplaced_ids, FeedbackMessages.misplaced)
+        _add_msg_if_exists(missing_ids, FeedbackMessages.not_placed)
 
         if misplaced_ids and self.attempts_remain:
             feedback_msgs.append(FeedbackMessages.MISPLACED_ITEMS_RETURNED)
 
-        if self.attempts_remain and (misplaced_ids or missing_ids):
-            feedback_msgs.append(self.data['feedback']['start'])
-        else:
-            feedback_msgs.append(self.data['feedback']['finish'])
+        overall_feedback_key = 'start' if self.attempts_remain and (misplaced_ids or missing_ids) else 'finish'
+        feedback_msgs.append(self.data['feedback'][overall_feedback_key])
 
         if not self.attempts_remain:
             feedback_msgs.append(FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=self.grade))
+
         return feedback_msgs, misplaced_ids
 
     def _drop_item_standard(self, item_attempt):
@@ -657,9 +650,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         all_items = [str(item['id']) for item in self.data['items']]
         item_state = self._get_item_state()
 
-        required_items = [item_id for item_id in all_items if self._get_item_zones(int(item_id)) != []]
-        placed_items = [item_id for item_id in all_items if item_id in item_state]
-        correct_items = [item_id for item_id in placed_items if item_state[item_id]['correct']]
+        required_items = set(item_id for item_id in all_items if self._get_item_zones(int(item_id)) != [])
+        placed_items = set(item_id for item_id in all_items if item_id in item_state)
+        correct_items = set(item_id for item_id in placed_items if item_state[item_id]['correct'])
 
         return required_items, placed_items, correct_items
 

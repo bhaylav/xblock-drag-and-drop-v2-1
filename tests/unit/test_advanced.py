@@ -421,12 +421,10 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
     def _submit_incorrect_solution(self):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_1})
-        self.call_handler(self.DROP_ITEM_HANDLER, self._make_submission(1, self.ZONE_1))
-        self.call_handler(self.DROP_ITEM_HANDLER, self._make_submission(0, self.ZONE_2))
         return 0, 1
 
     def test_do_attempt_feedback_incorrect(self):
-        self._submit_solution({0: self.ZONE_2, 1: self.ZONE_1})
+        self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
 
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         expected_misplaced = FeedbackMessages.misplaced(1)
