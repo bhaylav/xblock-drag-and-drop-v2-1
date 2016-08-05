@@ -723,17 +723,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         correct_count, required_count = self._get_item_stats()
         return correct_count == required_count
 
-    def _get_unique_id(self):
-        """
-        Returns unique_id
-        """
-        usage_id = self.scope_ids.usage_id
-        try:
-            return usage_id.name
-        except AttributeError:
-            # workaround for xblock workbench
-            return usage_id
-
     @staticmethod
     def workbench_scenarios():
         """
