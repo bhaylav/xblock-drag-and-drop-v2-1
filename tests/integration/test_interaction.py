@@ -631,7 +631,7 @@ class AssessmentInteractionTest(
         feedback_lines = [
             "FEEDBACK",
             FeedbackMessages.correctly_placed(1),
-            FeedbackMessages.misplaced(2),
+            FeedbackMessages.misplaced(1),
             FeedbackMessages.not_placed(2),
             FeedbackMessages.MISPLACED_ITEMS_RETURNED,
             START_FEEDBACK
