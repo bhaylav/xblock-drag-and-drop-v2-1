@@ -190,9 +190,16 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
     def _submit_complete_solution(self):
         self._submit_solution(self.CORRECT_SOLUTION)
 
+    def _submit_partial_solution(self):
+        raise NotImplementedException()
+
     def _reset_problem(self):
         self.call_handler(self.RESET_HANDLER, data={})
         self.assertEqual(self.block.item_state, {})
+
+    def _set_final_attempt(self):
+        self.block.max_attempts = 5
+        self.block.num_attempts = 4
 
     def test_multiple_drop_item(self):
         item_zone_map = {0: self.ZONE_1, 1: self.ZONE_2}
@@ -277,9 +284,18 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
             self.assertTrue(self.block.completed)
             self.assertFalse(patched_publish.called)
 
+    def test_get_user_state_finished_after_final_attempt(self):
+        self._set_final_attempt()
+        self._submit_partial_solution()
+        self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+
+        self.assertFalse(self.block.attempts_remain)  # precondition check
+
+        res = self.call_handler(self.USER_STATE_HANDLER, data={})
+        self.assertTrue(res['finished'])
+
     def test_do_attempt_incorrect_final_attempt_publish_grade(self):
-        self.block.max_attempts = 5
-        self.block.num_attempts = 4
+        self._set_final_attempt()
 
         correctness = self._submit_partial_solution()
         expected_grade = self.block.weight * correctness
@@ -305,8 +321,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
 
         self._reset_problem()
 
-        self.block.max_attempts = 5
-        self.block.num_attempts = 4
+        self._set_final_attempt()
 
         self._submit_partial_solution()
 
@@ -473,8 +488,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
         self._reset_problem()
         # make it a last attempt so we can check feedback
-        self.block.max_attempts = 5
-        self.block.num_attempts = 4
+        self._set_final_attempt()
 
         self._submit_solution({0: self.ZONE_1})  # partial solution, 0.33 score
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
@@ -484,8 +498,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertIn(expected_feedback, res['feedback'])
 
     def test_do_attempt_shows_final_feedback_at_last_attempt(self):
-        self.block.max_attempts = 5
-        self.block.num_attempts = 4
+        self._set_final_attempt()
 
         self._submit_partial_solution()
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})

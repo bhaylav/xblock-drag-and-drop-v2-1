@@ -445,11 +445,11 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
         item_feedback_key = 'correct' if is_correct else 'incorrect'
         item_feedback = item['feedback'][item_feedback_key]
-        overall_feedback = self.data['feedback']['finish'] if self._is_finished() else None
+        overall_feedback = self.data['feedback']['finish'] if self._is_correct_answer() else None
 
         return {
             'correct': is_correct,
-            'finished': self._is_finished(),
+            'finished': self._is_correct_answer(),
             'overall_feedback': overall_feedback,
             'feedback': item_feedback
         }
@@ -483,9 +483,8 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         }
 
     def _mark_complete_and_publish_grade(self):
-        # don't publish the grade if the student has already completed the problem
         if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attempts_remain):
-            self.completed = self._is_finished() or not self.attempts_remain
+            self.completed = self._is_correct_answer() or not self.attempts_remain
             grade = self._get_grade()
             if grade > self.grade:
                 self.grade = grade
@@ -565,9 +564,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
                 del item["correct"]
 
         if self.mode == self.STANDARD_MODE:
-            is_finished = self._is_finished()
+            is_finished = self._is_correct_answer()
         else:
-            is_finished = self.num_attempts >= self.max_attempts > 0
+            is_finished = not self.attempts_remain
 
         return {
             'items': item_state,
@@ -671,7 +670,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         correct_count, required_count = self._get_item_stats()
         return correct_count / float(required_count) * self.weight
 
-    def _is_finished(self):
+    def _is_correct_answer(self):
         """
         All items are at their correct place and a value has been
         submitted for each item that expects a value.
