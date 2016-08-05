@@ -1,3 +1,4 @@
+""" Default data for Drag and Drop v2 XBlock """
 from .utils import _
 
 TARGET_IMG_DESCRIPTION = _(

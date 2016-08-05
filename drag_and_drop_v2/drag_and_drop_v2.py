@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-
+""" Drag and Drop v2 XBlock """
 # Imports ###########################################################
 
 import json
@@ -185,6 +185,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
 
         def items_without_answers():
+            """
+            Removes feedback and answer from items
+            """
             items = copy.deepcopy(self.data.get('items', ''))
             for item in items:
                 del item['feedback']
@@ -284,6 +287,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def studio_submit(self, submissions, suffix=''):
+        """
+        Handles studio save.
+        """
         self.display_name = submissions['display_name']
         self.mode = submissions['mode']
         self.max_attempts = submissions['max_attempts']
@@ -301,6 +307,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def drop_item(self, item_attempt, suffix=''):
+        """
+        Handles dropping item into a zone.
+        """
         self._validate_drop_item(item_attempt)
 
         if self.mode == self.ASSESSMENT_MODE:
@@ -315,6 +324,11 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def do_attempt(self, data, suffix=''):
+        """
+        Checks submitted solution and returns feedback.
+
+        Raises 400 error in standard mode.
+        """
         self._validate_do_attempt()
 
         self.num_attempts += 1
@@ -333,6 +347,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def publish_event(self, data, suffix=''):
+        """
+        Handler to publish XBlock event from frontend
+        """
         try:
             event_type = data.pop('event_type')
         except KeyError:
@@ -343,6 +360,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @XBlock.json_handler
     def reset(self, data, suffix=''):
+        """
+        Resets problem to initial state
+        """
         self.item_state = {}
         return self._get_user_state()
 
@@ -353,6 +373,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @property
     def i18n_service(self):
+        """ Obtains translation service """
         i18n_service = self.runtime.service(self, "i18n")
         if i18n_service:
             return i18n_service
@@ -379,6 +400,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
 
     @property
     def attempts_remain(self):
+        """
+        Checks if current student still have more attempts.
+        """
         return self.max_attempts is None or self.max_attempts == 0 or self.num_attempts < self.max_attempts
 
     @XBlock.handler
@@ -389,6 +413,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return webob.Response(body=json.dumps(data), content_type='application/json')
 
     def _validate_do_attempt(self):
+        """
+        Validates if `do_attempt` handler should be executed
+        """
         if self.mode != self.ASSESSMENT_MODE:
             raise JsonHandlerError(
                 400,
@@ -401,6 +428,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             )
 
     def _get_do_attempt_feedback(self):
+        """
+        Returns feedback for `do_attempt` handler.
+        """
         required_ids, placed_ids, correct_ids = self._get_item_raw_stats()
         missing_ids = required_ids - placed_ids
         misplaced_ids = placed_ids - correct_ids
@@ -408,6 +438,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         feedback_msgs = []
 
         def _add_msg_if_exists(ids_list, message):
+            """ Adds message to feedback messages if corresponding items list is not empty """
             if ids_list:
                 feedback_msgs.append(message(len(ids_list), self.i18n_service.ngettext))
 
@@ -427,6 +458,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return feedback_msgs, misplaced_ids
 
     def _drop_item_standard(self, item_attempt):
+        """
+        Handles dropping item to a zone in standard mode.
+        """
         item = self._get_item_definition(item_attempt['val'])
 
         is_correct = self._is_attempt_correct(item_attempt)  # Student placed item in a correct zone
@@ -448,6 +482,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         }
 
     def _drop_item_assessment(self, item_attempt):
+        """
+        Handles dropping item into a zone in assessment mode
+        """
         if not self.attempts_remain:
             raise JsonHandlerError(409, self.i18n_service.gettext("Max number of attempts reached"))
 
@@ -462,12 +499,18 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {}
 
     def _validate_drop_item(self, item):
+        """
+        Validates `drop_item` parameters
+        """
         zone = self._get_zone_by_uid(item['zone'])
         if not zone:
             raise JsonHandlerError(400, "Item zone data invalid.")
 
     @staticmethod
     def _make_state_from_attempt(attempt, correct):
+        """
+        Converts "attempt" data coming from browser into "state" entry stored in item_state
+        """
         return {
             'zone': attempt['zone'],
             'correct': correct,
@@ -476,6 +519,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         }
 
     def _mark_complete_and_publish_grade(self):
+        """
+        Helper method to update `self.comnpleted` and submit grade event if appropriate conditions met.
+        """
         if not self.completed or (self.mode == self.ASSESSMENT_MODE and not self.attempts_remain):
             self.completed = self._is_correct_answer() or not self.attempts_remain
             grade = self._get_grade()
@@ -484,6 +530,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
                 self._publish_grade()
 
     def _publish_grade(self):
+        """
+        Publishes grade
+        """
         try:
             self.runtime.publish(self, 'grade', {
                 'value': self.grade,
@@ -495,6 +544,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             pass
 
     def _publish_item_dropped_event(self, attempt, is_correct):
+        """
+        Publishes item dropped event.
+        """
         item = self._get_item_definition(attempt['val'])
         # attempt should already be validated here - not doing the check for existing zone again
         zone = self._get_zone_by_uid(attempt['zone'])
@@ -672,6 +724,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return correct_count == required_count
 
     def _get_unique_id(self):
+        """
+        Returns unique_id
+        """
         usage_id = self.scope_ids.usage_id
         try:
             return usage_id.name
