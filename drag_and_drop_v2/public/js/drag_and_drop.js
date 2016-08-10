@@ -282,7 +282,7 @@ function DragAndDropTemplates(configuration) {
               h(
                   "span.attempts-used#"+attemptsUsedId, {style: {display: attemptsUsedDisplay}},
                   gettext("You have used {used} of {total} attempts.")
-                      .replace("{used}", ctx.num_attempts).replace("{total}", ctx.max_attempts)
+                      .replace("{used}", ctx.attempts).replace("{total}", ctx.max_attempts)
               )
           ])
         );
@@ -983,7 +983,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             url: runtime.handlerUrl(element, "do_attempt"),
             data: '{}'
         }).done(function(data){
-            state.num_attempts = data.num_attempts;
+            state.attempts = data.attempts;
             state.overall_feedback = data.feedback;
             if (attemptsRemain()) {
                 data.misplaced_items.forEach(function(misplaced_item_id) {
@@ -1009,7 +1009,7 @@ function DragAndDropBlock(runtime, element, configuration) {
     };
 
     var attemptsRemain = function() {
-        return !configuration.max_attempts || configuration.max_attempts > state.num_attempts;
+        return !configuration.max_attempts || configuration.max_attempts > state.attempts;
     };
 
     var render = function() {
@@ -1071,7 +1071,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             show_title: configuration.show_title,
             mode: configuration.mode,
             max_attempts: configuration.max_attempts,
-            num_attempts: state.num_attempts,
+            attempts: state.attempts,
             problem_html: configuration.problem_text,
             show_problem_header: configuration.show_problem_header,
             show_submit_answer: configuration.mode == DragAndDropBlock.ASSESSMENT_MODE,

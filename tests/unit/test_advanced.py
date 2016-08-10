@@ -10,7 +10,7 @@ from xblockutils.resources import ResourceLoader
 
 from drag_and_drop_v2.utils import FeedbackMessages
 
-from ..utils import make_block, TestCaseMixin, generate_max_and_num_attempts
+from ..utils import make_block, TestCaseMixin, generate_max_and_attempts
 
 
 # Globals ###########################################################
@@ -131,7 +131,7 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
                 "0": {"x_percent": "33%", "y_percent": "11%", "correct": True, "zone": self.ZONE_1}
             },
             "finished": False,
-            "num_attempts": 0,
+            "attempts": 0,
             'overall_feedback': self.initial_feedback(),
         }
         self.assertEqual(expected_state, self.call_handler('get_user_state', method="GET"))
@@ -155,7 +155,7 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
                 }
             },
             "finished": True,
-            "num_attempts": 0,
+            "attempts": 0,
             'overall_feedback': self.FINAL_FEEDBACK,
         }
         self.assertEqual(expected_state, self.call_handler('get_user_state', method="GET"))
@@ -199,7 +199,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
 
     def _set_final_attempt(self):
         self.block.max_attempts = 5
-        self.block.num_attempts = 4
+        self.block.attempts = 4
 
     def test_multiple_drop_item(self):
         item_zone_map = {0: self.ZONE_1, 1: self.ZONE_2}
@@ -223,12 +223,12 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
     @ddt.data(
         (None, 10, False),
         (0, 12, False),
-        *(generate_max_and_num_attempts())
+        *(generate_max_and_attempts())
     )
     @ddt.unpack
-    def test_do_attempt_validation(self, max_attempts, num_attempts, expect_validation_error):
+    def test_do_attempt_validation(self, max_attempts, attempts, expect_validation_error):
         self.block.max_attempts = max_attempts
-        self.block.num_attempts = num_attempts
+        self.block.attempts = attempts
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={}, expect_json=False)
 
         if expect_validation_error:
@@ -237,13 +237,13 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
             self.assertEqual(res.status_code, 200)
 
     @ddt.data(*[random.randint(0, 100) for _ in xrange(10)])  # pylint: disable=star-args
-    def test_do_attempt_raises_number_of_attempts(self, num_attempts):
-        self.block.num_attempts = num_attempts
-        self.block.max_attempts = num_attempts + 1
+    def test_do_attempt_raises_number_of_attempts(self, attempts):
+        self.block.attempts = attempts
+        self.block.max_attempts = attempts + 1
 
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        self.assertEqual(self.block.num_attempts, num_attempts + 1)
-        self.assertEqual(res['num_attempts'], self.block.num_attempts)
+        self.assertEqual(self.block.attempts, attempts + 1)
+        self.assertEqual(res['attempts'], self.block.attempts)
 
     def test_do_attempt_correct_mark_complete_and_publish_grade(self):
         self._submit_complete_solution()

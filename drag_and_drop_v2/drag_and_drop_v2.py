@@ -127,7 +127,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         default={},
     )
 
-    num_attempts = Integer(
+    attempts = Integer(
         help=_("Number of attempts learner used"),
         scope=Scope.user_state,
         default=0
@@ -331,7 +331,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
         self._validate_do_attempt()
 
-        self.num_attempts += 1
+        self.attempts += 1
         self._mark_complete_and_publish_grade()
 
         feedback_msgs, misplaced_ids = self._get_do_attempt_feedback()
@@ -340,7 +340,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             del self.item_state[item_id]
 
         return {
-            'num_attempts': self.num_attempts,
+            'attempts': self.attempts,
             'misplaced_items': list(misplaced_ids),
             'feedback': ''.join(["<p>{}</p>".format(msg) for msg in feedback_msgs])
         }
@@ -403,7 +403,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
         Checks if current student still have more attempts.
         """
-        return self.max_attempts is None or self.max_attempts == 0 or self.num_attempts < self.max_attempts
+        return self.max_attempts is None or self.max_attempts == 0 or self.attempts < self.max_attempts
 
     @XBlock.handler
     def get_user_state(self, request, suffix=''):
@@ -616,7 +616,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {
             'items': item_state,
             'finished': is_finished,
-            'num_attempts': self.num_attempts,
+            'attempts': self.attempts,
             'overall_feedback': self.data['feedback']['finish' if is_finished else 'start'],
         }
 
