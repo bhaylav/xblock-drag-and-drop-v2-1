@@ -221,7 +221,6 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             "target_img_description": self.target_img_description,
             "item_background_color": self.item_background_color or None,
             "item_text_color": self.item_text_color or None,
-            "initial_feedback": self.data['feedback']['start'],
             # final feedback (data.feedback.finish) is not included - it may give away answers.
         }
 
@@ -334,7 +333,9 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         self.attempts += 1
         self._mark_complete_and_publish_grade()
 
-        feedback_msgs, misplaced_ids = self._get_do_attempt_feedback()
+        overall_feedback_msgs, misplaced_ids = self._get_do_attempt_feedback()
+        misplaced_items = [self._get_item_definition(int(item_id)) for item_id in misplaced_ids]
+        feedback_msgs = [item['feedback']['incorrect'] for item in misplaced_items]
 
         for item_id in misplaced_ids:
             del self.item_state[item_id]
@@ -342,7 +343,8 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {
             'attempts': self.attempts,
             'misplaced_items': list(misplaced_ids),
-            'feedback': ''.join(["<p>{}</p>".format(msg) for msg in feedback_msgs])
+            'feedback': self._suppress_empty_messages(feedback_msgs),
+            'overall_feedback': self._suppress_empty_messages(overall_feedback_msgs)
         }
 
     @XBlock.json_handler
@@ -477,8 +479,8 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         return {
             'correct': is_correct,
             'finished': self._is_correct_answer(),
-            'overall_feedback': overall_feedback,
-            'feedback': item_feedback
+            'overall_feedback': self._suppress_empty_messages([overall_feedback]),
+            'feedback': self._suppress_empty_messages([item_feedback])
         }
 
     def _drop_item_assessment(self, item_attempt):
@@ -505,6 +507,13 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         zone = self._get_zone_by_uid(item['zone'])
         if not zone:
             raise JsonHandlerError(400, "Item zone data invalid.")
+
+    @staticmethod
+    def _suppress_empty_messages(messages):
+        """
+        Filters out empty messages from the list.
+        """
+        return [msg for msg in messages if msg]
 
     @staticmethod
     def _make_state_from_attempt(attempt, correct):
@@ -613,11 +622,13 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         else:
             is_finished = not self.attempts_remain
 
+        overall_feedback = [self.data['feedback']['finish' if is_finished else 'start']]
+
         return {
             'items': item_state,
             'finished': is_finished,
             'attempts': self.attempts,
-            'overall_feedback': self.data['feedback']['finish' if is_finished else 'start'],
+            'overall_feedback': self._suppress_empty_messages(overall_feedback),
         }
 
     def _get_item_state(self):
@@ -642,7 +653,10 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
         Returns definition (settings) for item identified by `item_id`.
         """
-        return next(i for i in self.data['items'] if i['id'] == item_id)
+        try:
+            return next(i for i in self.data['items'] if i['id'] == item_id)
+        except StopIteration:
+            raise Exception(self.data['items'], item_id)
 
     def _get_item_zones(self, item_id):
         """

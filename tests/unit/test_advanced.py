@@ -24,12 +24,16 @@ class BaseDragAndDropAjaxFixture(TestCaseMixin):
     ZONE_1 = None
     ZONE_2 = None
 
+    OVERALL_FEEDBACK_KEY = "overall_feedback"
+    FEEDBACK_KEY = "feedback"
+
     FEEDBACK = {
         0: {"correct": None, "incorrect": None},
         1: {"correct": None, "incorrect": None},
         2: {"correct": None, "incorrect": None}
     }
 
+    START_FEEDBACK = None
     FINAL_FEEDBACK = None
 
     FOLDER = None
@@ -54,11 +58,6 @@ class BaseDragAndDropAjaxFixture(TestCaseMixin):
     def expected_configuration(cls):
         return json.loads(loader.load_unicode('data/{}/config_out.json'.format(cls.FOLDER)))
 
-    @classmethod
-    def initial_feedback(cls):
-        """ The initial overall_feedback value """
-        return cls.expected_configuration()["initial_feedback"]
-
     def test_get_configuration(self):
         self.assertEqual(self.block.get_configuration(), self.expected_configuration())
 
@@ -71,33 +70,36 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
         item_id, zone_id = 0, self.ZONE_2
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
         res = self.call_handler(self.DROP_ITEM_HANDLER, data)
+        expected_feedback = [self.FEEDBACK[item_id]["incorrect"]] if self.FEEDBACK[item_id]["incorrect"] else []
         self.assertEqual(res, {
-            "overall_feedback": None,
+            "overall_feedback": [],
             "finished": False,
             "correct": False,
-            "feedback": self.FEEDBACK[item_id]["incorrect"]
+            "feedback": expected_feedback
         })
 
     def test_drop_item_wrong_without_feedback(self):
         item_id, zone_id = 2, self.ZONE_1
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
         res = self.call_handler(self.DROP_ITEM_HANDLER, data)
+        expected_feedback = [self.FEEDBACK[item_id]["incorrect"]] if self.FEEDBACK[item_id]["incorrect"] else []
         self.assertEqual(res, {
-            "overall_feedback": None,
+            "overall_feedback": [],
             "finished": False,
             "correct": False,
-            "feedback": self.FEEDBACK[item_id]["incorrect"]
+            "feedback": expected_feedback
         })
 
     def test_drop_item_correct(self):
         item_id, zone_id = 0, self.ZONE_1
         data = {"val": item_id, "zone": zone_id, "x_percent": "33%", "y_percent": "11%"}
         res = self.call_handler(self.DROP_ITEM_HANDLER, data)
+        expected_feedback = [self.FEEDBACK[item_id]["correct"]] if self.FEEDBACK[item_id]["correct"] else []
         self.assertEqual(res, {
-            "overall_feedback": None,
+            "overall_feedback": [],
             "finished": False,
             "correct": True,
-            "feedback": self.FEEDBACK[item_id]["correct"]
+            "feedback": expected_feedback
         })
 
     def test_grading(self):
@@ -132,17 +134,17 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
             },
             "finished": False,
             "attempts": 0,
-            'overall_feedback': self.initial_feedback(),
+            'overall_feedback': [self.START_FEEDBACK],
         }
         self.assertEqual(expected_state, self.call_handler('get_user_state', method="GET"))
 
         data = {"val": 1, "zone": self.ZONE_2, "x_percent": "22%", "y_percent": "22%"}
         res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         self.assertEqual(res, {
-            "overall_feedback": self.FINAL_FEEDBACK,
+            "overall_feedback": [self.FINAL_FEEDBACK],
             "finished": True,
             "correct": True,
-            "feedback": self.FEEDBACK[1]["correct"]
+            "feedback": [self.FEEDBACK[1]["correct"]]
         })
 
         expected_state = {
@@ -156,7 +158,7 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
             },
             "finished": True,
             "attempts": 0,
-            'overall_feedback': self.FINAL_FEEDBACK,
+            'overall_feedback': [self.FINAL_FEEDBACK],
         }
         self.assertEqual(expected_state, self.call_handler('get_user_state', method="GET"))
 
@@ -310,7 +312,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
             })
 
             expected_grade_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=expected_grade)
-            self.assertIn(expected_grade_feedback, res['feedback'])
+            self.assertIn(expected_grade_feedback, res[self.OVERALL_FEEDBACK_KEY])
 
     def test_do_attempt_incorrect_final_attempt_after_correct(self):
         self._submit_complete_solution()
@@ -330,7 +332,7 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
 
             expected_grade_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=1.0)
             self.assertFalse(patched_publish.called)
-            self.assertIn(expected_grade_feedback, res['feedback'])
+            self.assertIn(expected_grade_feedback, res[self.OVERALL_FEEDBACK_KEY])
             self.assertEqual(self.block.grade, 1.0)
 
     def test_do_attempt_misplaced_ids(self):
@@ -338,7 +340,8 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
 
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
         self.assertTrue(res['misplaced_items'], misplaced_ids)
-        self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
+        overall_feedback = res[self.OVERALL_FEEDBACK_KEY]
+        self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, overall_feedback)
 
     def test_get_user_state_does_not_include_correctness(self):
         self._submit_complete_solution()
@@ -365,6 +368,7 @@ class TestDragAndDropHtmlData(StandardModeFixture, unittest.TestCase):
         2: {"correct": "", "incorrect": ""}
     }
 
+    START_FEEDBACK = "HTML <strong>Intro</strong> Feed"
     FINAL_FEEDBACK = "Final <strong>feedback</strong>!"
 
 
@@ -380,6 +384,7 @@ class TestDragAndDropPlainData(StandardModeFixture, unittest.TestCase):
         2: {"correct": "", "incorrect": ""}
     }
 
+    START_FEEDBACK = "This is the initial feedback."
     FINAL_FEEDBACK = "This is the final feedback."
 
 
@@ -388,6 +393,8 @@ class TestOldDataFormat(TestDragAndDropPlainData):
     Make sure we can work with the slightly-older format for 'data' field values.
     """
     FOLDER = "old"
+
+    START_FEEDBACK = "Intro Feed"
     FINAL_FEEDBACK = "Final Feed"
 
     ZONE_1 = "Zone 1"
@@ -409,7 +416,8 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
     FEEDBACK = {
         0: {"correct": "Yes 1", "incorrect": "No 1"},
         1: {"correct": "Yes 2", "incorrect": "No 2"},
-        2: {"correct": "", "incorrect": ""}
+        2: {"correct": "", "incorrect": ""},
+        3: {"correct": "", "incorrect": ""}
     }
 
     START_FEEDBACK = "This is the initial feedback."
@@ -427,54 +435,60 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
 
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.misplaced(1)
-        expected_not_placed = FeedbackMessages.not_placed(1)
-        self.assertIn(expected_misplaced, res['feedback'])
-        self.assertIn(expected_not_placed, res['feedback'])
-        self.assertIn(self.START_FEEDBACK, res['feedback'])
-
-    def test_do_attempt_feedback_incorrect_not_placed(self):
-        self._submit_solution({0: self.ZONE_2, 1: self.ZONE_2})
-        res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.misplaced(1)
-        expected_not_placed = FeedbackMessages.not_placed(1)
-        self.assertIn(expected_misplaced, res['feedback'])
-        self.assertIn(expected_not_placed, res['feedback'])
-        self.assertIn(self.START_FEEDBACK, res['feedback'])
+        item_feedback, overall_feedback = res[self.FEEDBACK_KEY], res[self.OVERALL_FEEDBACK_KEY]
+        self.assertEqual(item_feedback, [self.FEEDBACK[0]['incorrect']])
+        self.assertEqual(overall_feedback, [
+            FeedbackMessages.correctly_placed(1),
+            FeedbackMessages.misplaced(1),
+            FeedbackMessages.not_placed(1),
+            FeedbackMessages.MISPLACED_ITEMS_RETURNED,
+            self.START_FEEDBACK
+        ])
 
     def test_do_attempt_feedback_not_placed(self):
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_not_placed = FeedbackMessages.not_placed(3)
-        self.assertIn(expected_not_placed, res['feedback'])
-        self.assertIn(self.START_FEEDBACK, res['feedback'])
+        item_feedback, overall_feedback = res[self.FEEDBACK_KEY], res[self.OVERALL_FEEDBACK_KEY]
+        self.assertEqual(item_feedback, [])
+        self.assertEqual(overall_feedback, [
+            FeedbackMessages.not_placed(3),
+            self.START_FEEDBACK
+        ])
 
     def test_do_attempt_feedback_correct_and_decoy(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 3: self.ZONE_2})  # incorrect solution - decoy placed
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_misplaced = FeedbackMessages.misplaced(1)
-        expected_correct = FeedbackMessages.correctly_placed(2)
-        self.assertIn(expected_misplaced, res['feedback'])
-        self.assertIn(expected_correct, res['feedback'])
-        self.assertIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
-        self.assertIn(self.START_FEEDBACK, res['feedback'])
+        item_feedback, overall_feedback = res[self.FEEDBACK_KEY], res[self.OVERALL_FEEDBACK_KEY]
+        self.assertEqual(item_feedback, [])
+        self.assertEqual(overall_feedback, [
+            FeedbackMessages.correctly_placed(2),
+            FeedbackMessages.misplaced(1),
+            FeedbackMessages.not_placed(1),
+            FeedbackMessages.MISPLACED_ITEMS_RETURNED,
+            self.START_FEEDBACK
+        ])
 
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_correct = FeedbackMessages.correctly_placed(3)
-        self.assertIn(expected_correct, res['feedback'])
-        self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
-        self.assertIn(self.FINAL_FEEDBACK, res['feedback'])
+
+        item_feedback, overall_feedback = res[self.FEEDBACK_KEY], res[self.OVERALL_FEEDBACK_KEY]
+        self.assertEqual(item_feedback, [])
+        self.assertEqual(overall_feedback, [
+            FeedbackMessages.correctly_placed(3),
+            self.FINAL_FEEDBACK
+        ])
 
     def test_do_attempt_feedback_partial(self):
         self._submit_solution({0: self.ZONE_1})  # partial solution
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        expected_correct = FeedbackMessages.correctly_placed(1)
-        expected_missing = FeedbackMessages.not_placed(2)
-        self.assertIn(expected_correct, res['feedback'])
-        self.assertIn(expected_missing, res['feedback'])
-        self.assertNotIn(FeedbackMessages.MISPLACED_ITEMS_RETURNED, res['feedback'])
-        self.assertIn(self.START_FEEDBACK, res['feedback'])
+
+        item_feedback, overall_feedback = res[self.FEEDBACK_KEY], res[self.OVERALL_FEEDBACK_KEY]
+        self.assertEqual(item_feedback, [])
+        self.assertEqual(overall_feedback, [
+            FeedbackMessages.correctly_placed(1),
+            FeedbackMessages.not_placed(2),
+            self.START_FEEDBACK
+        ])
 
     def test_do_attempt_keeps_highest_score(self):
         self.assertFalse(self.block.completed)  # precondition check
@@ -493,11 +507,13 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertEqual(self.block.grade, expected_score)
 
         expected_feedback = FeedbackMessages.FINAL_ATTEMPT_TPL.format(score=expected_score)
-        self.assertIn(expected_feedback, res['feedback'])
+        overall_feedback = res[self.OVERALL_FEEDBACK_KEY]
+        self.assertIn(expected_feedback, overall_feedback)
 
     def test_do_attempt_shows_final_feedback_at_last_attempt(self):
         self._set_final_attempt()
 
         self._submit_partial_solution()
         res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
-        self.assertIn(self.FINAL_FEEDBACK, res['feedback'])
+        overall_feedback = res[self.OVERALL_FEEDBACK_KEY]
+        self.assertIn(self.FINAL_FEEDBACK, overall_feedback)

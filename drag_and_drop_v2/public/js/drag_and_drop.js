@@ -227,12 +227,17 @@ function DragAndDropTemplates(configuration) {
     };
 
     var feedbackTemplate = function(ctx) {
-        var feedback_display = ctx.feedback_html ? 'block' : 'none';
         var properties = { attributes: { 'aria-live': 'polite' } };
+        var messages = ctx.overall_feedback_messages || [];
+        var feedback_display = messages.length > 0 ? 'block' : 'none';
+        var feedback_messages = messages.map(function(message) {
+            return h("p.message", {innerHTML: message}, []);
+        });
+
         return (
             h('section.feedback', properties, [
                 h('h3.title1', { style: { display: feedback_display } }, gettext('Feedback')),
-                h('p.message', { style: { display: feedback_display }, innerHTML: ctx.feedback_html })
+                h('div.messages', { style: { display: feedback_display } }, feedback_messages)
             ])
         );
     };
@@ -312,13 +317,42 @@ function DragAndDropTemplates(configuration) {
         )
     };
 
+    var itemFeedbackPopupTemplate = function(ctx) {
+        var popupSelector = 'div.popup';
+        var msgs = (ctx.feedback_messages || []).filter(function(msg) { return (msg) ? true : false; });
+        var popup_content;
+
+        if (msgs.length > 0 && !ctx.last_action_correct) {
+            popupSelector += '.popup-incorrect';
+        }
+
+        if (msgs.length > 1) {
+            popup_content = h("div.popup-content", {}, [
+                (!ctx.last_action_correct) ? h("p", {}, gettext("Some of your answers were not correct")) : null,
+                h("p", {}, gettext("Hints:")),
+                h("ul", {}, msgs.map(function(message) {
+                    return h("li", {innerHTML: message}, []);
+                }))
+            ])
+        } else {
+            popup_content = h("div.popup-content", {}, msgs.map(function(message) {
+                return h("p", {innerHTML: message}, []);
+            }))
+        }
+
+        return h(
+            popupSelector, {style: {display: msgs.length > 0 ? 'block' : 'none'} },
+            [
+                h('div.close.icon-remove-sign.fa-times-circle'),
+                popup_content
+            ]
+        )
+    };
+
     var mainTemplate = function(ctx) {
         var problemTitle = ctx.show_title ? h('h2.problem-title', {innerHTML: ctx.title_html}) : null;
         var problemHeader = ctx.show_problem_header ? h('h3.title1', gettext('Problem')) : null;
-        var popupSelector = 'div.popup';
-        if (ctx.popup_html && !ctx.last_action_correct) {
-            popupSelector += '.popup-incorrect';
-        }
+
         // Render only items_in_bank and items_placed_unaligned here;
         // items placed in aligned zones will be rendered by zoneTemplate.
         var is_item_placed = function(i) { return i.is_placed; };
@@ -357,16 +391,7 @@ function DragAndDropTemplates(configuration) {
                             },
                         },
                         [
-                            h(
-                                popupSelector,
-                                {
-                                    style: {display: ctx.popup_html ? 'block' : 'none'},
-                                },
-                                [
-                                    h('div.close.icon-remove-sign.fa-times-circle'),
-                                    h('p.popup-content', {innerHTML: ctx.popup_html}),
-                                ]
-                            ),
+                            itemFeedbackPopupTemplate(ctx),
                             h('div.target-img-wrapper', [
                                 h('img.target-img', {src: ctx.target_img_src, alt: ctx.target_img_description}),
                             ]
@@ -615,7 +640,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         if (state.closing) {
             var data = {
                 event_type: 'edx.drag_and_drop_v2.feedback.closed',
-                content: previousFeedback || state.feedback,
+                content: concatenateFeedback(previousFeedback || state.feedback),
                 manually: state.manually_closed,
             };
             truncateField(data, 'content');
@@ -627,7 +652,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         if (state.feedback) {
             var data = {
                 event_type: 'edx.drag_and_drop_v2.feedback.opened',
-                content: state.feedback,
+                content: concatenateFeedback(state.feedback),
             };
             truncateField(data, 'content');
             publishEvent(data);
@@ -638,6 +663,10 @@ function DragAndDropBlock(runtime, element, configuration) {
         if (!state.finished) {
             initDraggable();
         }
+    };
+
+    var concatenateFeedback = function (feedback_msgs_list) {
+        return feedback_msgs_list.join('\n');
     };
 
     var updateDOM = function(state) {
@@ -973,6 +1002,17 @@ function DragAndDropBlock(runtime, element, configuration) {
         });
     };
 
+    var wrapMessage = function(element, message) {
+        return "<"+element+">"+message+"</"+element+">";
+    };
+
+    var concatFeedbackMessages = function(messages, wrapper_element, prefix) {
+        var wrapped_messages = messages.map(function(message) {
+            return wrapMessage(wrapper_element, message);
+        });
+        return prefix + wrapped_messages.join("");
+    };
+
     var doAttempt = function(evt) {
         evt.preventDefault();
         state.submit_spinner = true;
@@ -984,7 +1024,13 @@ function DragAndDropBlock(runtime, element, configuration) {
             data: '{}'
         }).done(function(data){
             state.attempts = data.attempts;
-            state.overall_feedback = data.feedback;
+            state.feedback = data.feedback;
+            state.overall_feedback = data.overall_feedback;
+
+            if (data.feedback) {
+                state.last_action_correct = false;
+            }
+
             if (attemptsRemain()) {
                 data.misplaced_items.forEach(function(misplaced_item_id) {
                     delete state.items[misplaced_item_id]
@@ -1084,8 +1130,8 @@ function DragAndDropBlock(runtime, element, configuration) {
             // state - parts that can change:
             last_action_correct: state.last_action_correct,
             item_bank_focusable: item_bank_focusable,
-            popup_html: state.feedback || '',
-            feedback_html: $.trim(state.overall_feedback),
+            feedback_messages: state.feedback,
+            overall_feedback_messages: state.overall_feedback,
             disable_reset_button: !canReset(),
             disable_submit_button: !canSubmitAttempt(),
             submit_spinner: state.submit_spinner

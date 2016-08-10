@@ -42,7 +42,6 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
             "target_img_description": TARGET_IMG_DESCRIPTION,
             "item_background_color": None,
             "item_text_color": None,
-            "initial_feedback": START_FEEDBACK,
             "url_name": "",
         })
         self.assertEqual(zones, DEFAULT_DATA["zones"])
@@ -70,7 +69,7 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
                 'items': {},
                 'finished': False,
                 "attempts": 0,
-                'overall_feedback': START_FEEDBACK,
+                'overall_feedback': [START_FEEDBACK],
             })
         assert_user_state_empty()
 
@@ -101,7 +100,7 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
             },
             'finished': True,
             "attempts": 0,
-            'overall_feedback': FINISH_FEEDBACK,
+            'overall_feedback': [FINISH_FEEDBACK],
         })
 
         # Reset to initial conditions

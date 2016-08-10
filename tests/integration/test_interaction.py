@@ -2,13 +2,10 @@
 
 from ddt import ddt, data, unpack
 from mock import Mock, patch
-
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
-
-from workbench.runtime import WorkbenchRuntime
 from xblockutils.resources import ResourceLoader
 
 from drag_and_drop_v2.default_data import (
@@ -19,7 +16,6 @@ from drag_and_drop_v2.default_data import (
 )
 from drag_and_drop_v2.utils import FeedbackMessages
 from .test_base import BaseIntegrationTest
-
 
 # Globals ###########################################################
 
@@ -260,7 +256,7 @@ class InteractionTestBase(object):
                 self.assertEqual(feedback_popup_html, '')
                 self.assertFalse(popup.is_displayed())
             else:
-                self.assertEqual(feedback_popup_html, definition.feedback_positive)
+                self.assertEqual(feedback_popup_html, "<p>{}</p>".format(definition.feedback_positive))
                 self.assertEqual(popup.get_attribute('class'), 'popup')
                 self.assertTrue(popup.is_displayed())
 
@@ -487,14 +483,17 @@ class AssessmentTestMixin(object):
     Provides helper methods for assessment tests
     """
     @staticmethod
-    def _wait_until_enabled(element):
+    def _wait_until_enabled(element, message=None):
         wait = WebDriverWait(element, 2)
-        wait.until(lambda e: e.is_displayed() and e.get_attribute('disabled') is None)
+        wait.until(lambda e: e.is_displayed() and e.get_attribute('disabled') is None, message)
+
+    def _just_wait(self, seconds):
+        self.browser.implicitly_wait(seconds)
 
     def click_submit(self):
         submit_button = self._get_submit_button()
 
-        self._wait_until_enabled(submit_button)
+        self._wait_until_enabled(submit_button, "Submit button is not clickable")
 
         submit_button.click()
 
@@ -657,6 +656,23 @@ class AssessmentInteractionTest(
         expected_feedback = "\n".join(feedback_lines)
         self.assertEqual(self._get_feedback().text, expected_feedback)
 
+    def test_multiple_misplaced_item_feedback(self):
+        self.place_item(0, MIDDLE_ZONE_ID, Keys.RETURN)
+        self.place_item(1, BOTTOM_ZONE_ID, Keys.RETURN)
+        self.place_item(2, TOP_ZONE_ID, Keys.RETURN)
+
+        self.click_submit()
+
+        placed_item_definitions = [self.items_map[item_id] for item_id in (1, 2, 3)]
+
+        expected_message_elements = [
+            "<li>{msg}</li>".format(msg=definition.feedback_negative)
+            for definition in placed_item_definitions
+        ]
+
+        for message_element in expected_message_elements:
+            self.assertIn(message_element, self._get_popup_content().get_attribute('innerHTML'))
+
 
 class MultipleValidOptionsInteractionTest(DefaultDataTestMixin, InteractionTestBase, BaseIntegrationTest):
 
@@ -680,73 +696,6 @@ class MultipleValidOptionsInteractionTest(DefaultDataTestMixin, InteractionTestB
 
     def _get_scenario_xml(self):
         return self._get_custom_scenario_xml("data/test_multiple_options_data.json")
-
-
-@ddt
-class EventsFiredTest(DefaultDataTestMixin, InteractionTestBase, BaseIntegrationTest):
-    """
-    Tests that the analytics events are fired and in the proper order.
-    """
-    # These events must be fired in this order.
-    scenarios = (
-        {
-            'name': 'edx.drag_and_drop_v2.loaded',
-            'data': {},
-        },
-        {
-            'name': 'edx.drag_and_drop_v2.item.picked_up',
-            'data': {'item_id': 0},
-        },
-        {
-            'name': 'grade',
-            'data': {'max_value': 1, 'value': (1.0 / 4)},
-        },
-        {
-            'name': 'edx.drag_and_drop_v2.item.dropped',
-            'data': {
-                'is_correct': True,
-                'item_id': 0,
-                'location': TOP_ZONE_TITLE,
-                'location_id': TOP_ZONE_ID,
-            },
-        },
-        {
-            'name': 'edx.drag_and_drop_v2.feedback.opened',
-            'data': {
-                'content': ITEM_CORRECT_FEEDBACK.format(zone=TOP_ZONE_TITLE),
-                'truncated': False,
-            },
-        },
-        {
-            'name': 'edx.drag_and_drop_v2.feedback.closed',
-            'data': {
-                'manually': False,
-                'content': ITEM_CORRECT_FEEDBACK.format(zone=TOP_ZONE_TITLE),
-                'truncated': False,
-            },
-        },
-    )
-
-    def setUp(self):
-        mock = Mock()
-        context = patch.object(WorkbenchRuntime, 'publish', mock)
-        context.start()
-        self.addCleanup(context.stop)
-        self.publish = mock
-        super(EventsFiredTest, self).setUp()
-
-    def _get_scenario_xml(self):  # pylint: disable=no-self-use
-        return "<vertical_demo><drag-and-drop-v2/></vertical_demo>"
-
-    @data(*enumerate(scenarios))  # pylint: disable=star-args
-    @unpack
-    def test_event(self, index, event):
-        self.parameterized_item_positive_feedback_on_good_move(self.items_map)
-        dummy, name, published_data = self.publish.call_args_list[index][0]
-        self.assertEqual(name, event['name'])
-        self.assertEqual(
-                published_data, event['data']
-        )
 
 
 class PreventSpaceBarScrollTest(DefaultDataTestMixin, InteractionTestBase, BaseIntegrationTest):
