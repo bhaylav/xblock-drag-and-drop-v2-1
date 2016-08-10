@@ -482,12 +482,12 @@ If everything is correct, it will silently exit and create `translations/en/LC_M
 
 **Note:** As of 2016-08-04, XBlock translation feature was (partially?) broken, so switching to other locale did not 
 cause Drag and Drop v2 to be fully translated - only some strings that happen to exist in edx-platform translation
-files are translated. This is a bug on edx-platform side.
+files are translated. There's an ongoing effort to fix this problem: https://openedx.atlassian.net/browse/WL-230.
 
 Building fake "Esperanto" translation
 -------------------------------------
 
-AS previously said, this fake translation mainly exists for testing reasons. For edX platform it is built using Dummy
+As previously said, this fake translation mainly exists for testing reasons. For edX platform it is built using Dummy
 translator from edX i18n-tools. Luckily, it is possible to use "translation" generation feature without the rest of
 i18n-tools.
 
@@ -495,7 +495,7 @@ To do so, in any virtualenv, install i18n-tools, i.e.
 
     (viertualenv)$ pip install -e git+https://github.com/edx/i18n-tools.git
     
-Than start python interpreter, import `Dummy` translator and follow instructions on `Dummy` docstring:
+Then start python interpreter, import `Dummy` translator and follow instructions on `Dummy` docstring:
  
     (virtualenv)$ python
     >>> from i18n.dummy import Dummy
@@ -505,4 +505,4 @@ Than start python interpreter, import `Dummy` translator and follow instructions
     >>> conv = Dummy()
     >>> print conv.convert("String to translate")
     
-Than copy output and paste it into `translations/eo/LC_MESSAGES/text.po`.
+Then copy output and paste it into `translations/eo/LC_MESSAGES/text.po`.
