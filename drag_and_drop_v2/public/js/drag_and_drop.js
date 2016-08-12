@@ -231,7 +231,7 @@ function DragAndDropTemplates(configuration) {
         var messages = ctx.overall_feedback_messages || [];
         var feedback_display = messages.length > 0 ? 'block' : 'none';
         var feedback_messages = messages.map(function(message) {
-            return h("p.message", {innerHTML: message}, []);
+            return h("p.message", {innerHTML: message});
         });
 
         return (
@@ -319,7 +319,7 @@ function DragAndDropTemplates(configuration) {
 
     var itemFeedbackPopupTemplate = function(ctx) {
         var popupSelector = 'div.popup';
-        var msgs = (ctx.feedback_messages || []).filter(function(msg) { return (msg) ? true : false; });
+        var msgs = ctx.feedback_messages || [];
         var popup_content;
 
         if (msgs.length > 0 && !ctx.last_action_correct) {
@@ -1003,7 +1003,7 @@ function DragAndDropBlock(runtime, element, configuration) {
     };
 
     var wrapMessage = function(element, message) {
-        return "<"+element+">"+message+"</"+element+">";
+        return "<" + element + ">" + message + "</" + element + ">";
     };
 
     var concatFeedbackMessages = function(messages, wrapper_element, prefix) {
@@ -1026,10 +1026,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             state.attempts = data.attempts;
             state.feedback = data.feedback;
             state.overall_feedback = data.overall_feedback;
-
-            if (data.feedback) {
-                state.last_action_correct = false;
-            }
+            state.last_action_correct = data.correct;
 
             if (attemptsRemain()) {
                 data.misplaced_items.forEach(function(misplaced_item_id) {
@@ -1117,7 +1114,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             show_title: configuration.show_title,
             mode: configuration.mode,
             max_attempts: configuration.max_attempts,
-            attempts: state.attempts,
             problem_html: configuration.problem_text,
             show_problem_header: configuration.show_problem_header,
             show_submit_answer: configuration.mode == DragAndDropBlock.ASSESSMENT_MODE,
@@ -1128,6 +1124,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             zones: configuration.zones,
             items: items,
             // state - parts that can change:
+            attempts: state.attempts,
             last_action_correct: state.last_action_correct,
             item_bank_focusable: item_bank_focusable,
             feedback_messages: state.feedback,

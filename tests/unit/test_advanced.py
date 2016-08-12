@@ -251,25 +251,27 @@ class AssessmentModeFixture(BaseDragAndDropAjaxFixture):
         self._submit_complete_solution()
 
         with mock.patch('workbench.runtime.WorkbenchRuntime.publish', mock.Mock()) as patched_publish:
-            self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+            res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
 
             self.assertTrue(self.block.completed)
             patched_publish.assert_called_once_with(self.block, 'grade', {
                 'value': self.block.weight,
                 'max_value': self.block.weight,
             })
+            self.assertTrue(res['correct'])
 
     def test_do_attempt_incorrect_publish_grade(self):
         correctness = self._submit_partial_solution()
 
         with mock.patch('workbench.runtime.WorkbenchRuntime.publish', mock.Mock()) as patched_publish:
-            self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
+            res = self.call_handler(self.DO_ATTEMPT_HANDLER, data={})
 
             self.assertFalse(self.block.completed)
             patched_publish.assert_called_once_with(self.block, 'grade', {
                 'value': self.block.weight * correctness,
                 'max_value': self.block.weight,
             })
+            self.assertFalse(res['correct'])
 
     def test_do_attempt_post_correct_no_publish_grade(self):
         for item_id, zone_id in self.CORRECT_SOLUTION.iteritems():

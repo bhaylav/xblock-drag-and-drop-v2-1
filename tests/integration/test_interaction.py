@@ -1,7 +1,6 @@
 # Imports ###########################################################
 
 from ddt import ddt, data, unpack
-from mock import Mock, patch
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
@@ -656,7 +655,7 @@ class AssessmentInteractionTest(
         expected_feedback = "\n".join(feedback_lines)
         self.assertEqual(self._get_feedback().text, expected_feedback)
 
-    def test_multiple_misplaced_item_feedback(self):
+    def test_per_item_feedback_multiple_misplaced(self):
         self.place_item(0, MIDDLE_ZONE_ID, Keys.RETURN)
         self.place_item(1, BOTTOM_ZONE_ID, Keys.RETURN)
         self.place_item(2, TOP_ZONE_ID, Keys.RETURN)

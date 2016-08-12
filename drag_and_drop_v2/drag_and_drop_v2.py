@@ -341,6 +341,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
             del self.item_state[item_id]
 
         return {
+            'correct': self._is_correct_answer(),
             'attempts': self.attempts,
             'misplaced_items': list(misplaced_ids),
             'feedback': self._suppress_empty_messages(feedback_msgs),
@@ -653,10 +654,7 @@ class DragAndDropBlock(XBlock, XBlockWithSettingsMixin, ThemableXBlockMixin):
         """
         Returns definition (settings) for item identified by `item_id`.
         """
-        try:
-            return next(i for i in self.data['items'] if i['id'] == item_id)
-        except StopIteration:
-            raise Exception(self.data['items'], item_id)
+        return next(i for i in self.data['items'] if i['id'] == item_id)
 
     def _get_item_zones(self, item_id):
         """
