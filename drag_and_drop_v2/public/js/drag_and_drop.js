@@ -320,20 +320,22 @@ function DragAndDropTemplates(configuration) {
     var itemFeedbackPopupTemplate = function(ctx) {
         var popupSelector = 'div.popup';
         var msgs = ctx.feedback_messages || [];
+        var have_messages = msgs.length > 0;
         var popup_content;
 
         if (msgs.length > 0 && !ctx.last_action_correct) {
             popupSelector += '.popup-incorrect';
         }
 
-        if (msgs.length > 1) {
-            popup_content = h("div.popup-content", {}, [
+        if (ctx.mode == DragAndDropBlock.ASSESSMENT_MODE) {
+            var content_items = [
                 (!ctx.last_action_correct) ? h("p", {}, gettext("Some of your answers were not correct")) : null,
                 h("p", {}, gettext("Hints:")),
                 h("ul", {}, msgs.map(function(message) {
                     return h("li", {innerHTML: message}, []);
                 }))
-            ])
+            ];
+            popup_content = h("div.popup-content", {}, have_messages ? content_items : []);
         } else {
             popup_content = h("div.popup-content", {}, msgs.map(function(message) {
                 return h("p", {innerHTML: message}, []);
@@ -341,7 +343,7 @@ function DragAndDropTemplates(configuration) {
         }
 
         return h(
-            popupSelector, {style: {display: msgs.length > 0 ? 'block' : 'none'} },
+            popupSelector, {style: {display: have_messages ? 'block' : 'none'} },
             [
                 h('div.close.icon-remove-sign.fa-times-circle'),
                 popup_content
