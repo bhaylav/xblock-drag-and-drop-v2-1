@@ -21,6 +21,7 @@ class BaseEventsTests(InteractionTestBase, BaseIntegrationTest):
         self.publish = mock
         super(BaseEventsTests, self).setUp()
 
+
 @ddt
 class EventsFiredTest(DefaultDataTestMixin, BaseEventsTests):
     """
